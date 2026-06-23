@@ -1,0 +1,223 @@
+#ppt-panel {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    width: 320px;
+    background: #fff;
+    box-shadow: 0 15px 40px rgba(0,0,0,.25);
+    overflow: hidden;
+    z-index: 99999999;
+    font-family: tahoma;
+    border-radius: 12px;
+    direction: rtl;
+}
+
+:host {
+    all: initial;
+}
+
+#ppt-panel,
+#ppt-panel * {
+    box-sizing: border-box;
+}
+
+    #ppt-panel button,
+    #ppt-panel input {
+        font-family: tahoma;
+    }
+
+#ppt-header {
+    height: 48px;
+    background: #1e293b;
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 12px;
+    cursor: move;
+}
+
+.ppt-title {
+    font-weight: bold;
+}
+
+#ppt-minimize {
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+}
+
+#ppt-tabs {
+    display: flex;
+    border-bottom: 1px solid #ddd;
+}
+
+.ppt-tab {
+    flex: 1;
+    border: none;
+    background: #f5f5f5;
+    padding: 12px;
+    cursor: pointer;
+}
+
+    .ppt-tab.active {
+        background: #2563eb;
+        color: white;
+    }
+
+.ppt-content {
+    display: none;
+    padding: 15px;
+}
+
+    .ppt-content.active {
+        display: block;
+    }
+
+#search,
+#price,
+#qty {
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 10px;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+}
+
+.primary-btn {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 6px;
+    background: #2563eb;
+    color: white;
+    cursor: pointer;
+    margin-bottom: 10px;
+}
+
+.btn-row {
+    display: flex;
+    gap: 10px;
+}
+
+.buy-btn, #buy {
+    flex: 1;
+    border: 1px solid gray !important;
+    border-radius: 22px;
+    padding: 3px;
+    border-radius: 6px;
+    padding: 12px;
+    background: #16a34a;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.sell-btn {
+    flex: 1;
+    border: 1px solid gray;
+    border-radius: 22px;
+    padding: 3px;
+    border-radius: 6px;
+    padding: 12px;
+    background: #dc2626;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+    .buy-btn:hover,
+    .sell-btn:hover,
+    .primary-btn:hover {
+        opacity: .9;
+    }
+
+#selected {
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 10px;
+    margin-bottom: 10px;
+    font-size: 12px;
+}
+
+#results {
+    max-height: 180px;
+    overflow-y: auto;
+    margin-bottom: 10px;
+    border: 1px solid #eee;
+}
+
+    #results div {
+        padding: 8px;
+        cursor: pointer;
+        border-bottom: 1px solid #eee;
+        font-size: 12px;
+    }
+
+        #results div:hover {
+            background: #f1f5f9;
+        }
+
+#log {
+    margin-top: 10px;
+    max-height: 160px;
+    overflow-y: auto;
+    background: #111827;
+    color: #f8fafc;
+    border-radius: 6px;
+    padding: 10px;
+}
+/*-------------------------------معاملات مشتقه----------------------*/
+#ppt-option {
+    text-align: left;
+}
+
+.ppt-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ppt-stats {
+    margin-top: 15px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 10px;
+}
+
+    .ppt-stats div {
+        margin: 6px 0;
+    }
+
+.status {
+    margin: 10px 0;
+    padding: 10px;
+    border-radius: 8px;
+    font-weight: bold;
+    text-align: center;
+    font-size: 12px;
+}
+
+    .status.running {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .status.stopped {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+#ppt-status-buy-alarm {
+    display: none;
+    color: greenyellow;
+    font-size: 12px;
+}
+#ppt-status-buy-alarm.show {
+    display: block;
+}
+/*---------------------------------------------------------------------*/

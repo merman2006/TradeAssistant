@@ -1,0 +1,97 @@
+<div id="ppt-panel">
+
+    <div id="ppt-header">
+
+        <div class="ppt-title">
+            Parsian Pro Trader
+        </div>
+
+        <div class="ppt-actions">
+            <button id="ppt-minimize">—</button>
+        </div>
+
+    </div>
+
+    <div id="ppt-tabs">
+
+        <button class="ppt-tab active" data-tab="stock">
+            معاملات سهام
+        </button>
+
+        <button class="ppt-tab" data-tab="option">
+            معاملات مشتقه
+        </button>
+
+    </div>
+
+    <div id="ppt-stock" class="ppt-content active">
+
+        <input id="search" placeholder="جستجوی نماد">
+
+        <button id="searchBtn" class="primary-btn">
+            جستجو
+        </button>
+
+        <div id="results"></div>
+
+        <div id="selected">
+            هیچ نمادی انتخاب نشده
+        </div>
+
+        <input id="price" placeholder="قیمت">
+
+        <input id="qty" placeholder="حجم">
+
+        <div class="btn-row">
+
+            <button id="buy" class="buy-btn">
+                ثبت خرید
+            </button>
+
+            <button id="sell" class="sell-btn">
+                ثبت فروش
+            </button>
+
+        </div>
+
+        <pre id="log"></pre>
+
+    </div>
+
+    <div id="ppt-option" class="ppt-content">
+        <div id="monitor-status" class="status stopped">
+            ⏹ متوقف
+        </div>
+        <div class="ppt-card">
+
+            <label>MaxValue</label>
+            <input id="opt-max-value" type="number">
+
+            <label>ExpectedBuyReturn</label>
+            <input id="opt-expected-return" type="number" step="0.01">
+
+            <button id="opt-start" class="buy-btn">
+                Start Monitoring
+            </button>
+
+            <button id="opt-stop" class="sell-btn">
+                Stop
+            </button>
+
+        </div>
+
+        <div class="ppt-stats">
+            <div id="ppt-status-buy-alarm">موقعیت مناسب برای خرید</div>
+            <div>Ask(A): <span id="ask-value">-</span></div>
+
+            <div>Bid(B): <span id="bid-value">-</span></div>
+
+            <div>Spread: <span id="spread-value">-</span></div>
+
+            <div>BuyReturn: <span id="return-value">-</span></div>
+
+        </div>
+
+    </div>
+
+</div>
