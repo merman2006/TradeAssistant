@@ -316,6 +316,12 @@
         font-size: 11px;
     }
 
+    .option-inputs input[type="number"],
+    .option-order-fields input[type="number"] {
+        direction: ltr;
+        text-align: left;
+    }
+
     .option-order-fields button {
         width: 100%;
         min-width: 0;
