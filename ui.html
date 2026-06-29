@@ -87,6 +87,15 @@
             <div id="option-symbols-status"></div>
         </div>
 
+        <div class="ppt-card option-strategy-card">
+            <div class="option-strategy-field">
+                <label for="opt-strategy">استراتژی</label>
+                <select id="opt-strategy">
+                    <option value="">در حال دریافت استراتژی‌ها...</option>
+                </select>
+            </div>
+        </div>
+
         <div class="option-positions">
             <section class="option-position-card buy-position">
                 <div class="option-inputs">
@@ -98,19 +107,18 @@
                 </div>
 
                 <div class="ppt-stats">
-                    <div id="ppt-status-buy-alarm">موقعیت مناسب خرید</div>
                     <div>Ask(A): <span id="ask-value">-</span></div>
 
                     <div>Bid(B): <span id="bid-value">-</span></div>
 
                     <div>Spread: <span id="buy-spread-value">-</span></div>
 
-                    <div>BuyReturn: <span id="buy-return-value">-</span></div>
+                    <div id="buy-return-row">BuyReturn: <span id="buy-return-value">-</span></div>
                 </div>
 
                 <div class="option-order-fields">
                     <label for="opt-buy-execution-count">تعداد اجرا</label>
-                    <input id="opt-buy-execution-count" type="number" min="1">
+                    <input id="opt-buy-execution-count" type="number" min="1" value="1">
 
                     <label for="opt-buy-quantity">تعداد خرید</label>
                     <input id="opt-buy-quantity" type="number" min="1">
@@ -118,6 +126,12 @@
                     <button id="opt-buy-order" class="buy-btn" type="button">
                         خرید
                     </button>
+
+                    <button id="opt-stop-execution" class="sell-btn" type="button" disabled>
+                        توقف اجرا
+                    </button>
+
+                    <span id="opt-execution-progress"></span>
                 </div>
             </section>
 
@@ -131,13 +145,12 @@
                 </div>
 
                 <div class="ppt-stats">
-                    <div id="ppt-status-sell-alarm">موقعیت مناسب فروش</div>
                     <div>Ask(B): <span id="sell-ask-b-value">-</span></div>
                     <div>Bid(A): <span id="sell-bid-a-value">-</span></div>
 
                     <div>Spread: <span id="sell-spread-value">-</span></div>
 
-                    <div>SellReturn: <span id="sell-return-value">-</span></div>
+                    <div id="sell-return-row">SellReturn: <span id="sell-return-value">-</span></div>
                 </div>
 
                 <div class="option-order-fields">

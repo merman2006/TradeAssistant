@@ -2,7 +2,7 @@
     position: fixed;
     top: 12px;
     left: 12px;
-    width: 420px;
+    width: 390px;
     background: #fff;
     box-shadow: 0 10px 28px rgba(0,0,0,.22);
     overflow: hidden;
@@ -29,7 +29,7 @@
     }
 
 #ppt-header {
-    height: 34px;
+    height: 26px;
     background: #1e293b;
     color: white;
     display: flex;
@@ -41,21 +41,21 @@
 
 .ppt-title {
     font-weight: bold;
-    font-size: 12px;
+    font-size: 10px;
 }
 
 #ppt-minimize {
     background: transparent;
     border: none;
     color: white;
-    font-size: 16px;
+    font-size: 13px;
     cursor: pointer;
     line-height: 1;
-    padding: 2px 4px;
+    padding: 1px 4px;
 }
 
 #ppt-tabs {
-    display: flex;
+    display: none;
     border-bottom: 1px solid #ddd;
 }
 
@@ -194,6 +194,15 @@
     margin-bottom: 6px;
 }
 
+    .option-monitor-actions button {
+        min-width: 0;
+        height: 24px;
+        padding: 3px 5px;
+        font-size: 10px;
+        line-height: 1.2;
+        white-space: nowrap;
+    }
+
     .option-monitor-actions button:disabled {
         cursor: not-allowed;
         opacity: .55;
@@ -221,6 +230,33 @@
 
 #option-symbols-status {
     grid-column: 1 / -1;
+}
+
+.option-strategy-card {
+    margin-bottom: 6px;
+}
+
+.option-strategy-field {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 4px;
+}
+
+.option-strategy-field label {
+    font-size: 10px;
+    white-space: nowrap;
+}
+
+.option-strategy-field select {
+    width: 100%;
+    min-width: 0;
+    padding: 4px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #fff;
+    direction: rtl;
+    font-size: 11px;
 }
 
 .option-positions {
@@ -283,9 +319,36 @@
     }
 
     .option-order-fields button {
-        grid-column: 1 / -1;
         width: 100%;
+        min-width: 0;
+        height: 24px;
         margin-top: 2px;
+        padding: 3px 4px;
+        font-size: 10px;
+        white-space: nowrap;
+    }
+
+    .option-order-fields button:disabled {
+        cursor: not-allowed;
+        opacity: .55;
+    }
+
+    .option-order-fields #opt-buy-order {
+        grid-column: 1;
+    }
+
+    .option-order-fields #opt-stop-execution {
+        grid-column: 2;
+    }
+
+    .option-order-fields #opt-execution-progress {
+        grid-column: 1 / -1;
+        min-height: 12px;
+        color: #475569;
+        font-size: 10px;
+        line-height: 1.2;
+        text-align: center;
+        white-space: nowrap;
     }
 
 .option-symbol-field select {
@@ -325,31 +388,8 @@
         margin: 3px 0;
     }
 
-.ppt-stats-title {
-    font-weight: bold;
-    text-align: center;
-    font-size: 14px;
-}
-
-#ppt-status-buy-alarm,
-#ppt-status-sell-alarm {
-    visibility: hidden;
-    font-weight: bold;
-    font-size: 10px;
-    margin: 0;
-}
-
-#ppt-status-buy-alarm {
+.ppt-stats .return-hit {
     color: #15803d;
+    font-weight: bold;
 }
-
-#ppt-status-sell-alarm {
-    color: #dc2626;
-}
-
-    #ppt-status-buy-alarm.show,
-    #ppt-status-sell-alarm.show {
-        display: block;
-        visibility: visible;
-    }
 /*---------------------------------------------------------------------*/

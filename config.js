@@ -7,7 +7,8 @@
             authStorageKey: "auth",
             endpoints: {
                 searchInstruments: "/api/PublicMessages/SearchInstruments",
-                orderEntry: "/api/Orders/OrderEntry"
+                orderEntry: "/api/Orders/OrderEntry",
+                optionStrategies: "/api/OptionStrategies/Get"
             }
         },
         "khobregan.tsetab.ir": {
@@ -16,7 +17,18 @@
             authStorageKey: "auth",
             endpoints: {
                 searchInstruments: "/api/PublicMessages/SearchInstruments",
-                orderEntry: "/api/Orders/OrderEntry"
+                orderEntry: "/api/Orders/OrderEntry",
+                optionStrategies: "/api/OptionStrategies/Get"
+            }
+        },
+        "khobregan-red.tsetab.ir": {
+            name: "Khobregan",
+            apiBaseUrl: "https://khobregan-red.tsetab.ir",
+            authStorageKey: "auth",
+            endpoints: {
+                searchInstruments: "/api/PublicMessages/SearchInstruments",
+                orderEntry: "/api/Orders/OrderEntry",
+                optionStrategies: "/api/OptionStrategies/Get"
             }
         }
     };

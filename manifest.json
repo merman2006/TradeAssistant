@@ -12,7 +12,8 @@
     {
       "matches": [
         "https://patris.parsianbroker.com/*",
-        "https://khobregan.tsetab.ir/*"
+        "https://khobregan.tsetab.ir/*",
+        "https://khobregan-red.tsetab.ir/*"
       ],
       "js": ["content.js"]
     }
@@ -22,7 +23,8 @@
       "resources": ["config.js", "ui.html", "ui.css", "ui.js"],
       "matches": [
         "https://patris.parsianbroker.com/*",
-        "https://khobregan.tsetab.ir/*"
+        "https://khobregan.tsetab.ir/*",
+        "https://khobregan-red.tsetab.ir/*"
       ]
     }
   ]
