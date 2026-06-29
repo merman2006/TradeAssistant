@@ -19,9 +19,17 @@
 
         document.body.appendChild(host);
 
-        const script = document.createElement("script");
-        script.src = chrome.runtime.getURL("ui.js");
-        document.body.appendChild(script);
+        const configScript = document.createElement("script");
+        configScript.src = chrome.runtime.getURL("config.js");
+
+        configScript.onload = () => {
+            const uiScript = document.createElement("script");
+            uiScript.src = chrome.runtime.getURL("ui.js");
+            document.body.appendChild(uiScript);
+            configScript.remove();
+        };
+
+        document.body.appendChild(configScript);
     }
 
     function wait() {

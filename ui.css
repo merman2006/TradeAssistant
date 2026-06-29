@@ -1,14 +1,15 @@
 #ppt-panel {
     position: fixed;
-    top: 20px;
-    left: 20px;
-    width: 320px;
+    top: 12px;
+    left: 12px;
+    width: 420px;
     background: #fff;
-    box-shadow: 0 15px 40px rgba(0,0,0,.25);
+    box-shadow: 0 10px 28px rgba(0,0,0,.22);
     overflow: hidden;
     z-index: 99999999;
     font-family: tahoma;
-    border-radius: 12px;
+    font-size: 12px;
+    border-radius: 8px;
     direction: rtl;
 }
 
@@ -22,31 +23,35 @@
 }
 
     #ppt-panel button,
-    #ppt-panel input {
+    #ppt-panel input,
+    #ppt-panel select {
         font-family: tahoma;
     }
 
 #ppt-header {
-    height: 48px;
+    height: 34px;
     background: #1e293b;
     color: white;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0 12px;
+    padding: 0 8px;
     cursor: move;
 }
 
 .ppt-title {
     font-weight: bold;
+    font-size: 12px;
 }
 
 #ppt-minimize {
     background: transparent;
     border: none;
     color: white;
-    font-size: 20px;
+    font-size: 16px;
     cursor: pointer;
+    line-height: 1;
+    padding: 2px 4px;
 }
 
 #ppt-tabs {
@@ -58,8 +63,9 @@
     flex: 1;
     border: none;
     background: #f5f5f5;
-    padding: 12px;
+    padding: 7px;
     cursor: pointer;
+    font-size: 12px;
 }
 
     .ppt-tab.active {
@@ -69,47 +75,49 @@
 
 .ppt-content {
     display: none;
-    padding: 15px;
+    padding: 8px;
 }
 
     .ppt-content.active {
         display: block;
     }
 
+        .ppt-content.active.minimized {
+            display: none;
+        }
+
 #search,
 #price,
 #qty {
     width: 100%;
     box-sizing: border-box;
-    margin-bottom: 10px;
-    padding: 10px;
+    margin-bottom: 6px;
+    padding: 6px;
     border: 1px solid #ddd;
-    border-radius: 6px;
+    border-radius: 4px;
 }
 
 .primary-btn {
     width: 100%;
-    padding: 10px;
+    padding: 7px;
     border: none;
-    border-radius: 6px;
+    border-radius: 4px;
     background: #2563eb;
     color: white;
     cursor: pointer;
-    margin-bottom: 10px;
+    margin-bottom: 6px;
 }
 
 .btn-row {
     display: flex;
-    gap: 10px;
+    gap: 6px;
 }
 
 .buy-btn, #buy {
     flex: 1;
     border: 1px solid gray !important;
-    border-radius: 22px;
-    padding: 3px;
-    border-radius: 6px;
-    padding: 12px;
+    border-radius: 4px;
+    padding: 7px;
     background: #16a34a;
     color: white;
     font-weight: bold;
@@ -119,10 +127,8 @@
 .sell-btn {
     flex: 1;
     border: 1px solid gray;
-    border-radius: 22px;
-    padding: 3px;
-    border-radius: 6px;
-    padding: 12px;
+    border-radius: 4px;
+    padding: 7px;
     background: #dc2626;
     color: white;
     font-weight: bold;
@@ -138,24 +144,24 @@
 #selected {
     background: #f8fafc;
     border: 1px solid #e5e7eb;
-    border-radius: 6px;
-    padding: 10px;
-    margin-bottom: 10px;
-    font-size: 12px;
+    border-radius: 4px;
+    padding: 6px;
+    margin-bottom: 6px;
+    font-size: 11px;
 }
 
 #results {
     max-height: 180px;
     overflow-y: auto;
-    margin-bottom: 10px;
+    margin-bottom: 6px;
     border: 1px solid #eee;
 }
 
     #results div {
-        padding: 8px;
+        padding: 5px;
         cursor: pointer;
         border-bottom: 1px solid #eee;
-        font-size: 12px;
+        font-size: 11px;
     }
 
         #results div:hover {
@@ -163,61 +169,187 @@
         }
 
 #log {
-    margin-top: 10px;
+    margin-top: 6px;
     max-height: 160px;
     overflow-y: auto;
     background: #111827;
     color: #f8fafc;
-    border-radius: 6px;
-    padding: 10px;
+    border-radius: 4px;
+    padding: 6px;
 }
 /*-------------------------------معاملات مشتقه----------------------*/
 #ppt-option {
-    text-align: left;
+    text-align: right;
 }
 
 .ppt-card {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 4px;
+}
+
+.option-monitor-actions {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+    .option-monitor-actions button:disabled {
+        cursor: not-allowed;
+        opacity: .55;
+    }
+
+    .option-monitor-actions #opt-start.monitoring {
+        background: #15803d;
+        opacity: 1;
+    }
+
+.option-symbols-card {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 6px;
+    margin-bottom: 6px;
+}
+
+.option-symbol-field {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 4px;
+    text-align: right;
+}
+
+#option-symbols-status {
+    grid-column: 1 / -1;
+}
+
+.option-positions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    direction: rtl;
+}
+
+.option-position-card {
+    min-width: 0;
+    padding: 6px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: #f8fafc;
+}
+
+.option-inputs {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 4px;
+    margin-top: 2px;
+}
+
+    .option-inputs label {
+        font-size: 10px;
+        white-space: nowrap;
+    }
+
+    .option-inputs input {
+        width: 100%;
+        padding: 4px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 11px;
+    }
+
+.option-order-fields {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 4px;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid #ddd;
+}
+
+    .option-order-fields label {
+        font-size: 10px;
+        white-space: nowrap;
+    }
+
+    .option-order-fields input {
+        width: 100%;
+        padding: 4px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 11px;
+    }
+
+    .option-order-fields button {
+        grid-column: 1 / -1;
+        width: 100%;
+        margin-top: 2px;
+    }
+
+.option-symbol-field select {
+    width: 100%;
+    min-width: 0;
+    padding: 4px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #fff;
+    direction: rtl;
+    font-size: 11px;
+}
+
+#option-symbols-status {
+    min-height: 14px;
+    color: #991b1b;
+    font-size: 10px;
+    text-align: right;
+}
+
+#option-symbols-status.success {
+    color: #15803d;
 }
 
 .ppt-stats {
-    margin-top: 15px;
+    margin-top: 6px;
     border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 10px;
+    border-radius: 4px;
+    padding: 5px;
+    background: #fff;
+    direction: ltr;
+    text-align: left;
+    font-size: 11px;
 }
 
     .ppt-stats div {
-        margin: 6px 0;
+        margin: 3px 0;
     }
 
-.status {
-    margin: 10px 0;
-    padding: 10px;
-    border-radius: 8px;
+.ppt-stats-title {
     font-weight: bold;
     text-align: center;
-    font-size: 12px;
+    font-size: 14px;
 }
 
-    .status.running {
-        background: #dcfce7;
-        color: #166534;
-    }
-
-    .status.stopped {
-        background: #fee2e2;
-        color: #991b1b;
-    }
+#ppt-status-buy-alarm,
+#ppt-status-sell-alarm {
+    visibility: hidden;
+    font-weight: bold;
+    font-size: 10px;
+    margin: 0;
+}
 
 #ppt-status-buy-alarm {
-    display: none;
-    color: greenyellow;
-    font-size: 12px;
+    color: #15803d;
 }
-#ppt-status-buy-alarm.show {
-    display: block;
+
+#ppt-status-sell-alarm {
+    color: #dc2626;
 }
+
+    #ppt-status-buy-alarm.show,
+    #ppt-status-sell-alarm.show {
+        display: block;
+        visibility: visible;
+    }
 /*---------------------------------------------------------------------*/

@@ -4,20 +4,26 @@
   "version": "2.0",
   "host_permissions": [
     "https://patris.parsianbroker.com/*",
-    "https://red.parsianbroker.com/*"
+    "https://red.parsianbroker.com/*",
+    "https://khobregan.tsetab.ir/*",
+    "https://khobregan-red.tsetab.ir/*"
   ],
   "content_scripts": [
     {
       "matches": [
-        "https://patris.parsianbroker.com/*"
+        "https://patris.parsianbroker.com/*",
+        "https://khobregan.tsetab.ir/*"
       ],
       "js": ["content.js"]
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["ui.html", "ui.css", "ui.js"],
-      "matches": ["https://patris.parsianbroker.com/*"]
+      "resources": ["config.js", "ui.html", "ui.css", "ui.js"],
+      "matches": [
+        "https://patris.parsianbroker.com/*",
+        "https://khobregan.tsetab.ir/*"
+      ]
     }
   ]
 }
