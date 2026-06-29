@@ -84,25 +84,23 @@
                 </select>
             </div>
 
-            <div id="option-symbols-status"></div>
-        </div>
-
-        <div class="ppt-card option-strategy-card">
             <div class="option-strategy-field">
                 <label for="opt-strategy">استراتژی</label>
                 <select id="opt-strategy">
                     <option value="">در حال دریافت استراتژی‌ها...</option>
                 </select>
             </div>
+
+            <div id="option-symbols-status"></div>
         </div>
 
         <div class="option-positions">
             <section class="option-position-card buy-position">
                 <div class="option-inputs">
-                    <label for="opt-max-value">MaxValue</label>
+                    <label for="opt-max-value">بیشترین اسپرد</label>
                     <input id="opt-max-value" type="number">
 
-                    <label for="opt-expected-return">ExBuyReturn</label>
+                    <label for="opt-expected-return">حداقل بازده سرخط</label>
                     <input id="opt-expected-return" type="number" step="0.01">
                 </div>
 
@@ -121,10 +119,10 @@
                     <input id="opt-buy-execution-count" type="number" min="1" value="1">
 
                     <label for="opt-buy-quantity">تعداد خرید</label>
-                    <input id="opt-buy-quantity" type="number" min="1">
+                    <input id="opt-buy-quantity" type="number" min="1" value="10">
 
                     <button id="opt-buy-order" class="buy-btn" type="button">
-                        خرید
+                        باز کردن موقعیت
                     </button>
 
                     <button id="opt-stop-execution" class="sell-btn" type="button" disabled>
@@ -137,10 +135,10 @@
 
             <section class="option-position-card sell-position">
                 <div class="option-inputs">
-                    <label for="opt-premium">Premium</label>
+                    <label for="opt-premium">پریمیوم</label>
                     <input id="opt-premium" type="number">
 
-                    <label for="opt-expected-offset-return">ExOffsetReturn</label>
+                    <label for="opt-expected-offset-return">حداقل بازده آفست</label>
                     <input id="opt-expected-offset-return" type="number" step="0.01">
                 </div>
 
@@ -150,19 +148,25 @@
 
                     <div>Spread: <span id="sell-spread-value">-</span></div>
 
-                    <div id="sell-return-row">SellReturn: <span id="sell-return-value">-</span></div>
+                    <div id="sell-return-row">OffsetReturn: <span id="sell-return-value">-</span></div>
                 </div>
 
                 <div class="option-order-fields">
                     <label for="opt-sell-execution-count">تعداد اجرا</label>
-                    <input id="opt-sell-execution-count" type="number" min="1">
+                    <input id="opt-sell-execution-count" type="number" min="1" value="1">
 
                     <label for="opt-sell-quantity">تعداد فروش</label>
-                    <input id="opt-sell-quantity" type="number" min="1">
+                    <input id="opt-sell-quantity" type="number" min="1" value="10">
 
                     <button id="opt-sell-order" class="sell-btn" type="button">
-                        فروش
+                        آفست موقعیت
                     </button>
+
+                    <button id="opt-stop-offset-execution" class="sell-btn" type="button" disabled>
+                        توقف اجرا
+                    </button>
+
+                    <span id="opt-offset-execution-progress"></span>
                 </div>
             </section>
         </div>

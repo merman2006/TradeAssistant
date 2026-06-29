@@ -217,6 +217,7 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     column-gap: 6px;
+    row-gap: 6px;
     margin-bottom: 6px;
 }
 
@@ -232,11 +233,8 @@
     grid-column: 1 / -1;
 }
 
-.option-strategy-card {
-    margin-bottom: 6px;
-}
-
 .option-strategy-field {
+    grid-column: 1 / -1;
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
@@ -333,15 +331,18 @@
         opacity: .55;
     }
 
-    .option-order-fields #opt-buy-order {
+    .option-order-fields #opt-buy-order,
+    .option-order-fields #opt-sell-order {
         grid-column: 1;
     }
 
-    .option-order-fields #opt-stop-execution {
+    .option-order-fields #opt-stop-execution,
+    .option-order-fields #opt-stop-offset-execution {
         grid-column: 2;
     }
 
-    .option-order-fields #opt-execution-progress {
+    .option-order-fields #opt-execution-progress,
+    .option-order-fields #opt-offset-execution-progress {
         grid-column: 1 / -1;
         min-height: 12px;
         color: #475569;
