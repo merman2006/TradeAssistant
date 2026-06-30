@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.svg" alt="Trade Assistant logo" width="128">
+</p>
+
 # Trade Assistant
 
 Trade Assistant is a Chrome extension for adding a compact trading assistant panel to supported brokerage web platforms.
