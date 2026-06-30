@@ -2,6 +2,7 @@
   "manifest_version": 3,
   "name": "Parsian Pro Trader",
   "version": "2.0",
+  "author": "mohammad mohammadi",
   "host_permissions": [
     "https://patris.parsianbroker.com/*",
     "https://red.parsianbroker.com/*",

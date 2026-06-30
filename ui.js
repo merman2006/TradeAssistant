@@ -1408,7 +1408,7 @@ function checkSellCondition(
 
     if (offsetCondition.isHit) {
 
-        playAlarm();
+        //playAlarm();
         byId("sell-return-row").classList.add("return-hit");
     }
 }
