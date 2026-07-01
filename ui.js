@@ -249,8 +249,11 @@ let optionStrategiesRequest = null;
 let optionStrategySymbolsSignature = null;
 let optionExecutionStopRequested = false;
 let optionOffsetExecutionStopRequested = false;
+let optionPositionsTabClickTime = 0;
 
 const OPTION_INSTRUMENT_ID_PREFIX = "option-instrument-focus-target-";
+const OPTION_POSITIONS_TAB_LABEL = "موقعیت های اختیار";
+const OPTION_POSITIONS_TAB_CLICK_INTERVAL = 1500;
 const OPTION_STRATEGY_SELECTORS = [
     'ng-select[formcontrolname="buyOptionStrategyUniqueKey"]',
     ".-is-strategyDropdown"
@@ -341,6 +344,7 @@ function refreshOptionSymbols(autoStartMonitoring = true) {
 
     if (symbols.length) {
         status.innerText = "";
+        updateAutoOptionValues();
         if (autoStartMonitoring) {
             startOptionMonitoringIfReady();
         }
@@ -348,6 +352,167 @@ function refreshOptionSymbols(autoStartMonitoring = true) {
         symbolA.innerHTML = '<option value="">نمادی در صفحه پیدا نشد</option>';
         symbolB.innerHTML = '<option value="">نمادی در صفحه پیدا نشد</option>';
         status.innerText = "ابتدا قراردادهای موردنظر را به لیست نمادهای صفحه اضافه کنید.";
+    }
+}
+
+function escapeSelectorValue(value) {
+
+    if (window.CSS?.escape)
+        return CSS.escape(value);
+
+    return String(value || "")
+        .replace(/\\/g, "\\\\")
+        .replace(/"/g, '\\"');
+}
+
+function normalizeNumberText(value) {
+
+    const persianDigits = "۰۱۲۳۴۵۶۷۸۹";
+    const arabicDigits = "٠١٢٣٤٥٦٧٨٩";
+
+    return String(value || "")
+        .replace(/[۰-۹]/g, digit => persianDigits.indexOf(digit))
+        .replace(/[٠-٩]/g, digit => arabicDigits.indexOf(digit))
+        .replace(/,/g, "")
+        .trim();
+}
+
+function parseOptionNumber(value) {
+
+    const normalizedValue = normalizeNumberText(value)
+        .replace(/[^\d.-]/g, "");
+
+    if (!normalizedValue)
+        return null;
+
+    const number = Number(normalizedValue);
+
+    return Number.isFinite(number)
+        ? number
+        : null;
+}
+
+function formatOptionAutoValue(value) {
+
+    return Number.isInteger(value)
+        ? String(value)
+        : String(Number(value.toFixed(2)));
+}
+
+function normalizeDomText(value) {
+
+    return String(value || "")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+function getOptionPositionsTabButton() {
+
+    return Array
+        .from(document.querySelectorAll("button.c-tab, .c-tab"))
+        .find(button =>
+            normalizeDomText(button.innerText)
+                .includes(OPTION_POSITIONS_TAB_LABEL)
+        );
+}
+
+function isOptionPositionsTabSelected(button) {
+
+    return !!button?.closest(".-is-selected, .active, .selected");
+}
+
+function ensureOptionPositionsTabLoaded() {
+
+    const button = getOptionPositionsTabButton();
+
+    if (!button)
+        return;
+
+    const now = Date.now();
+
+    if (
+        isOptionPositionsTabSelected(button) &&
+        now - optionPositionsTabClickTime < OPTION_POSITIONS_TAB_CLICK_INTERVAL
+    ) {
+        return;
+    }
+
+    if (now - optionPositionsTabClickTime < OPTION_POSITIONS_TAB_CLICK_INTERVAL)
+        return;
+
+    optionPositionsTabClickTime = now;
+    button.click();
+}
+
+function getOptionPositionRow(instrumentId) {
+
+    if (!instrumentId)
+        return null;
+
+    return document.querySelector(
+        `.ag-center-cols-container [role="row"][row-id="${escapeSelectorValue(instrumentId)}"]`
+    );
+}
+
+function getOptionPositionValue(instrumentId, columnId) {
+
+    const row = getOptionPositionRow(instrumentId);
+    const cell = row?.querySelector(
+        `[col-id="${columnId}"]`
+    );
+
+    return parseOptionNumber(cell?.innerText);
+}
+
+function updateAutoOptionValues() {
+
+    if (!byId("opt-auto-values")?.checked)
+        return;
+
+    const instrumentIdA = byId("opt-symbol-a").value;
+    const instrumentIdB = byId("opt-symbol-b").value;
+
+    if (!instrumentIdA || !instrumentIdB)
+        return;
+
+    const positionRowA = getOptionPositionRow(instrumentIdA);
+    const positionRowB = getOptionPositionRow(instrumentIdB);
+
+    if (
+        !positionRowA ||
+        !positionRowB
+    ) {
+        ensureOptionPositionsTabLoaded();
+        return;
+    }
+
+    const breakEvenA = getOptionPositionValue(
+        instrumentIdA,
+        "breakEvenPrice"
+    );
+    const breakEvenB = getOptionPositionValue(
+        instrumentIdB,
+        "breakEvenPrice"
+    );
+    const strikeA = getOptionPositionValue(
+        instrumentIdA,
+        "strikePrice"
+    );
+    const strikeB = getOptionPositionValue(
+        instrumentIdB,
+        "strikePrice"
+    );
+
+    if (breakEvenA !== null && breakEvenB !== null) {
+        byId("opt-premium").value = formatOptionAutoValue(
+            Math.abs(breakEvenA - breakEvenB)
+        );
+    }
+
+    if (strikeA !== null && strikeB !== null) {
+        byId("opt-max-value").value = formatOptionAutoValue(
+            Math.abs(strikeB - strikeA)
+        );
     }
 }
 
@@ -1519,13 +1684,16 @@ byId("opt-stop")
 byId("opt-symbol-a").onchange = async () => {
 
     await refreshOptionStrategies();
+    updateAutoOptionValues();
     startOptionMonitoringIfReady();
 };
 byId("opt-symbol-b").onchange = async () => {
 
     await refreshOptionStrategies();
+    updateAutoOptionValues();
     startOptionMonitoringIfReady();
 };
+byId("opt-auto-values").onchange = updateAutoOptionValues;
 byId("opt-stop-execution").onclick = () => {
 
     optionExecutionStopRequested = true;
@@ -1608,6 +1776,8 @@ function setMonitoringState(running) {
 
 refreshOptionSymbols();
 refreshOptionStrategies();
+updateAutoOptionValues();
 setInterval(refreshOptionSymbols, 2000);
 setInterval(refreshOptionStrategies, 2000);
+setInterval(updateAutoOptionValues, 2000);
 /*---------------------------------------------------------------------*/
