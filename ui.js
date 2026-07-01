@@ -249,11 +249,10 @@ let optionStrategiesRequest = null;
 let optionStrategySymbolsSignature = null;
 let optionExecutionStopRequested = false;
 let optionOffsetExecutionStopRequested = false;
-let optionPositionsTabClickTime = 0;
+let optionPositionsTabClickRequested = false;
 
 const OPTION_INSTRUMENT_ID_PREFIX = "option-instrument-focus-target-";
 const OPTION_POSITIONS_TAB_LABEL = "موقعیت های اختیار";
-const OPTION_POSITIONS_TAB_CLICK_INTERVAL = 1500;
 const OPTION_STRATEGY_SELECTORS = [
     'ng-select[formcontrolname="buyOptionStrategyUniqueKey"]',
     ".-is-strategyDropdown"
@@ -423,24 +422,19 @@ function isOptionPositionsTabSelected(button) {
 
 function ensureOptionPositionsTabLoaded() {
 
+    if (optionPositionsTabClickRequested)
+        return;
+
     const button = getOptionPositionsTabButton();
 
     if (!button)
         return;
 
-    const now = Date.now();
+    optionPositionsTabClickRequested = true;
 
-    if (
-        isOptionPositionsTabSelected(button) &&
-        now - optionPositionsTabClickTime < OPTION_POSITIONS_TAB_CLICK_INTERVAL
-    ) {
-        return;
-    }
-
-    if (now - optionPositionsTabClickTime < OPTION_POSITIONS_TAB_CLICK_INTERVAL)
+    if (isOptionPositionsTabSelected(button))
         return;
 
-    optionPositionsTabClickTime = now;
     button.click();
 }
 
