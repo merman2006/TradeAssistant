@@ -507,18 +507,40 @@ function getOptionStrategyIdentity(strategy) {
 
 function distinctOptionStrategies(strategies) {
 
-    return strategies.filter((strategy, index, allStrategies) => {
+    return strategies.reduce((distinctStrategies, strategy) => {
 
         const current = getOptionStrategyIdentity(strategy);
-
-        return allStrategies.findIndex(item => {
+        const duplicateIndex = distinctStrategies.findIndex(item => {
 
             const candidate = getOptionStrategyIdentity(item);
 
             return (!!current.key && current.key === candidate.key) ||
                 (!!current.label && current.label === candidate.label);
-        }) === index;
-    });
+        });
+
+        if (duplicateIndex === -1) {
+            distinctStrategies.push(strategy);
+            return distinctStrategies;
+        }
+
+        const existing = distinctStrategies[duplicateIndex];
+
+        distinctStrategies[duplicateIndex] = {
+            ...existing,
+            key: existing.key || strategy.key,
+            label: existing.label || strategy.label,
+            baseInstrumentId:
+                existing.baseInstrumentId || strategy.baseInstrumentId,
+            strategyInstrumentId:
+                existing.strategyInstrumentId || strategy.strategyInstrumentId,
+            thirdInstrumentId:
+                existing.thirdInstrumentId || strategy.thirdInstrumentId,
+            isInDefaultSelect:
+                existing.isInDefaultSelect || strategy.isInDefaultSelect
+        };
+
+        return distinctStrategies;
+    }, []);
 }
 
 function getOptionStrategies() {
@@ -538,7 +560,8 @@ function getOptionStrategies() {
         .from(strategyLabels)
         .map(item => ({
             label: normalizeOptionStrategyLabel(item.innerText),
-            key: getStrategyKeyFromElement(item)
+            key: getStrategyKeyFromElement(item),
+            isInDefaultSelect: true
         }))
         .filter(strategy => strategy.label);
 
@@ -626,10 +649,18 @@ function autoSelectOptionStrategy(select, strategies, instrumentIdA, instrumentI
                 strategy,
                 instrumentIdA,
                 instrumentIdB
-            )
+            ),
+            isInDefaultSelect: !!strategy.isInDefaultSelect
         }))
         .filter(item => item.score > 0)
-        .sort((first, second) => second.score - first.score)[0]?.strategy;
+        .sort((first, second) => {
+
+            if (first.isInDefaultSelect !== second.isInDefaultSelect) {
+                return first.isInDefaultSelect ? -1 : 1;
+            }
+
+            return second.score - first.score;
+        })[0]?.strategy;
 
     if (matchedStrategy) {
         select.value = matchedStrategy.key || matchedStrategy.label;
@@ -654,7 +685,8 @@ async function refreshOptionStrategies() {
             key: option.dataset.strategyKey || findStrategyKey(option.value),
             baseInstrumentId: option.dataset.baseInstrumentId,
             strategyInstrumentId: option.dataset.strategyInstrumentId,
-            thirdInstrumentId: option.dataset.thirdInstrumentId
+            thirdInstrumentId: option.dataset.thirdInstrumentId,
+            isInDefaultSelect: option.dataset.isInDefaultSelect === "true"
         }))
         .filter(strategy => strategy.label);
 
@@ -742,6 +774,10 @@ async function refreshOptionStrategies() {
 
         if (strategy.thirdInstrumentId) {
             option.dataset.thirdInstrumentId = strategy.thirdInstrumentId;
+        }
+
+        if (strategy.isInDefaultSelect) {
+            option.dataset.isInDefaultSelect = "true";
         }
 
         select.appendChild(option);
