@@ -250,6 +250,12 @@ let optionStrategySymbolsSignature = null;
 let optionExecutionStopRequested = false;
 let optionOffsetExecutionStopRequested = false;
 let optionPositionsTabClickRequested = false;
+const ALARM_BEEP_COUNT = 5;
+const ALARM_BEEP_INTERVAL_MS = 500;
+const optionAlarmStates = {
+    buy: { isHit: false, signature: null },
+    offset: { isHit: false, signature: null }
+};
 
 const OPTION_INSTRUMENT_ID_PREFIX = "option-instrument-focus-target-";
 const OPTION_POSITIONS_TAB_LABEL = "موقعیت های اختیار";
@@ -1011,6 +1017,7 @@ function getBuyConditionState(ask, bid) {
 
     if (spread <= 0) {
         return {
+            expected,
             spread,
             buyReturn: null,
             isHit: false
@@ -1020,6 +1027,7 @@ function getBuyConditionState(ask, bid) {
     const buyReturn = ((maxValue / spread) - 1) * 100;
 
     return {
+        expected,
         spread,
         buyReturn,
         isHit: buyReturn > expected
@@ -1035,6 +1043,7 @@ function getOffsetConditionState(bidA, askB) {
 
     if (premium <= 0) {
         return {
+            expected: expectedOffsetReturn,
             spread,
             offsetReturn: null,
             isHit: false
@@ -1044,6 +1053,7 @@ function getOffsetConditionState(bidA, askB) {
     const offsetReturn = ((spread / premium) - 1) * 100;
 
     return {
+        expected: expectedOffsetReturn,
         spread,
         offsetReturn,
         isHit: offsetReturn > expectedOffsetReturn
@@ -1534,13 +1544,50 @@ async function sendOptionOffsetOrder() {
     }
 }
 
-function playAlarm() {
+function playAlarm(beepCount = ALARM_BEEP_COUNT) {
 
-    const audio = new Audio(
-        "https://actions.google.com/sounds/v1/alarms/beep_short.ogg"
-    );
+    let remainingBeeps = beepCount;
 
-    audio.play();
+    const beep = () => {
+
+        const audio = new Audio(
+            "https://actions.google.com/sounds/v1/alarms/beep_short.ogg"
+        );
+
+        audio.play().catch(() => {});
+
+        remainingBeeps--;
+
+        if (remainingBeeps > 0) {
+            setTimeout(beep, ALARM_BEEP_INTERVAL_MS);
+        }
+    };
+
+    beep();
+}
+
+function updateOptionAlarmState(type, isHit, signature = null) {
+
+    const state = optionAlarmStates[type];
+
+    if (state.signature !== signature) {
+        state.isHit = false;
+        state.signature = signature;
+    }
+
+    if (isHit && !state.isHit) {
+        playAlarm();
+    }
+
+    state.isHit = isHit;
+}
+
+function resetOptionAlarmStates() {
+
+    optionAlarmStates.buy.isHit = false;
+    optionAlarmStates.buy.signature = null;
+    optionAlarmStates.offset.isHit = false;
+    optionAlarmStates.offset.signature = null;
 }
 
 function checkBuyCondition(
@@ -1551,8 +1598,10 @@ function checkBuyCondition(
 
     const buyCondition = getBuyConditionState(ask, bid);
 
-    if (buyCondition.spread <= 0)
+    if (buyCondition.spread <= 0) {
+        updateOptionAlarmState("buy", false, buyCondition.expected);
         return;
+    }
 
     byId("ask-value").innerText = ask;
 
@@ -1563,9 +1612,13 @@ function checkBuyCondition(
     byId("buy-return-value").innerText =
         buyCondition.buyReturn.toFixed(2);
 
-    if (buyCondition.isHit) {
+    updateOptionAlarmState(
+        "buy",
+        buyCondition.isHit,
+        buyCondition.expected
+    );
 
-        //playAlarm();
+    if (buyCondition.isHit) {
         byId("buy-return-row").classList.add("return-hit");
         //const ok = confirm("شرط معامله برقرار شد\n\n" +"BuyReturn = " +buyReturn.toFixed(4));
 
@@ -1595,15 +1648,25 @@ function checkSellCondition(
     byId("sell-ask-b-value").innerText = askB;
     byId("sell-spread-value").innerText = offsetCondition.spread;
 
-    if (offsetCondition.offsetReturn === null)
+    if (offsetCondition.offsetReturn === null) {
+        updateOptionAlarmState(
+            "offset",
+            false,
+            offsetCondition.expected
+        );
         return;
+    }
 
     byId("sell-return-value").innerText =
         offsetCondition.offsetReturn.toFixed(2);
 
-    if (offsetCondition.isHit) {
+    updateOptionAlarmState(
+        "offset",
+        offsetCondition.isHit,
+        offsetCondition.expected
+    );
 
-        //playAlarm();
+    if (offsetCondition.isHit) {
         byId("sell-return-row").classList.add("return-hit");
     }
 }
@@ -1614,6 +1677,7 @@ function startOptionMonitoring(showMissingSymbolsMessage = true) {
 
     clearInterval(optionTimer);
     optionTimer = null;
+    resetOptionAlarmStates();
 
     refreshOptionSymbols(false);
 
@@ -1641,6 +1705,8 @@ function startOptionMonitoring(showMissingSymbolsMessage = true) {
                 ask,
                 bid
             );
+        } else {
+            updateOptionAlarmState("buy", false);
         }
 
         if (bidA && askB) {
@@ -1648,6 +1714,8 @@ function startOptionMonitoring(showMissingSymbolsMessage = true) {
                 bidA,
                 askB
             );
+        } else {
+            updateOptionAlarmState("offset", false);
         }
 
     }, 1000);
@@ -1671,6 +1739,7 @@ byId("opt-stop")
 
         clearInterval(optionTimer);
         optionTimer = null;
+        resetOptionAlarmStates();
         setMonitoringState(false);
 
     };
