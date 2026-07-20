@@ -1626,6 +1626,18 @@ function resetOptionAlarmStates() {
     optionAlarmStates.offset.signature = null;
 }
 
+function syncOptionAlarmControlsVisibility() {
+
+    const isEnabled = byId("opt-alarm-enabled").checked;
+
+    byId("opt-alarm-row").classList.toggle(
+        "alarm-enabled",
+        isEnabled
+    );
+    byId("opt-alarm-count").hidden = !isEnabled;
+    byId("opt-alarm-interval").hidden = !isEnabled;
+}
+
 function getOptionPreferenceKey(id) {
 
     return OPTION_PREFERENCES_STORAGE_PREFIX + id;
@@ -1698,6 +1710,30 @@ function bindOptionPreferencePersistence() {
             saveOptionPreference(field.id, field.type);
         });
     });
+}
+
+function resetOptionPreferences() {
+
+    OPTION_PERSISTED_FIELDS.forEach(field => {
+
+        const el = byId(field.id);
+
+        localStorage.removeItem(getOptionPreferenceKey(field.id));
+
+        if (!el)
+            return;
+
+        if (field.type === "checkbox") {
+            el.checked = el.defaultChecked;
+        } else {
+            el.value = el.defaultValue;
+        }
+    });
+
+    localStorage.removeItem(getOptionPreferenceKey("opt-settings-open"));
+    resetOptionAlarmStates();
+    syncOptionAlarmControlsVisibility();
+    updateAutoOptionValues();
 }
 
 function checkBuyCondition(
@@ -1844,6 +1880,7 @@ function startOptionMonitoringIfReady() {
 
 loadOptionPreferences();
 bindOptionPreferencePersistence();
+syncOptionAlarmControlsVisibility();
 
 byId("opt-start").onclick = () => startOptionMonitoring();
 
@@ -1882,9 +1919,14 @@ byId("opt-settings-toggle").onclick = () => {
     );
 };
 byId("opt-auto-values").onchange = updateAutoOptionValues;
-byId("opt-alarm-enabled").onchange = resetOptionAlarmStates;
+byId("opt-alarm-enabled").onchange = () => {
+
+    resetOptionAlarmStates();
+    syncOptionAlarmControlsVisibility();
+};
 byId("opt-alarm-count").onchange = resetOptionAlarmStates;
 byId("opt-alarm-interval").onchange = resetOptionAlarmStates;
+byId("opt-settings-reset").onclick = resetOptionPreferences;
 byId("opt-stop-execution").onclick = () => {
 
     optionExecutionStopRequested = true;

@@ -101,16 +101,19 @@
                         <span>پر کردن خودکار پریمیوم و بیشترین اسپرد</span>
                     </label>
 
-                    <label class="option-check-row">
-                        <input id="opt-alarm-enabled" type="checkbox" checked>
-                        <span>آلارم فعال باشد</span>
-                    </label>
+                    <div id="opt-alarm-row" class="option-alarm-row">
+                        <label class="option-check-row">
+                            <input id="opt-alarm-enabled" type="checkbox" checked>
+                            <span>آلارم</span>
+                        </label>
 
-                    <label for="opt-alarm-count">تعداد آلارم</label>
-                    <input id="opt-alarm-count" type="number" min="1" max="20" value="5">
+                        <input id="opt-alarm-count" type="number" min="1" max="20" value="5" title="تعداد آلارم">
+                        <input id="opt-alarm-interval" type="number" min="100" step="50" value="500" title="فاصله آلارم">
+                    </div>
 
-                    <label for="opt-alarm-interval">فاصله آلارم</label>
-                    <input id="opt-alarm-interval" type="number" min="100" step="50" value="500">
+                    <button id="opt-settings-reset" type="button">
+                        ریست تنظیمات
+                    </button>
                 </div>
             </div>
 

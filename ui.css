@@ -307,7 +307,7 @@
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
-    gap: 4px;
+    gap: 3px 4px;
     padding-top: 3px;
     border-top: 1px solid #e5e7eb;
 }
@@ -324,13 +324,46 @@
     .option-settings-body input[type="number"] {
         width: 100%;
         min-width: 0;
-        height: 22px;
-        padding: 3px 4px;
+        height: 20px;
+        padding: 2px 4px;
         border: 1px solid #ddd;
         border-radius: 4px;
         direction: ltr;
         text-align: left;
         font-size: 11px;
+    }
+
+    .option-settings-body .option-alarm-row {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: auto;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .option-settings-body .option-alarm-row.alarm-enabled {
+        grid-template-columns: auto 44px 58px;
+    }
+
+    .option-settings-body .option-alarm-row input[hidden] {
+        display: none;
+    }
+
+    .option-settings-body .option-alarm-row .option-check-row {
+        grid-column: auto;
+    }
+
+    .option-settings-body #opt-settings-reset {
+        grid-column: 1;
+        width: max-content;
+        height: 19px;
+        padding: 1px 6px;
+        border: 1px solid #cbd5e1;
+        border-radius: 4px;
+        background: #fff;
+        color: #334155;
+        cursor: pointer;
+        font-size: 10px;
     }
 
 .option-positions {
