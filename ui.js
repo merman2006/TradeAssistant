@@ -256,6 +256,19 @@ const optionAlarmStates = {
     buy: { isHit: false, signature: null },
     offset: { isHit: false, signature: null }
 };
+const OPTION_PREFERENCES_STORAGE_PREFIX = "ppt-option-preference:";
+const OPTION_PERSISTED_FIELDS = [
+    { id: "opt-auto-values", type: "checkbox" },
+    { id: "opt-alarm-enabled", type: "checkbox" },
+    { id: "opt-alarm-count", type: "value" },
+    { id: "opt-alarm-interval", type: "value" },
+    { id: "opt-expected-return", type: "value" },
+    { id: "opt-expected-offset-return", type: "value" },
+    { id: "opt-buy-execution-count", type: "value" },
+    { id: "opt-sell-execution-count", type: "value" },
+    { id: "opt-buy-quantity", type: "value" },
+    { id: "opt-sell-quantity", type: "value" }
+];
 
 const OPTION_INSTRUMENT_ID_PREFIX = "option-instrument-focus-target-";
 const OPTION_POSITIONS_TAB_LABEL = "موقعیت های اختیار";
@@ -1544,9 +1557,32 @@ async function sendOptionOffsetOrder() {
     }
 }
 
-function playAlarm(beepCount = ALARM_BEEP_COUNT) {
+function getOptionAlarmSettings() {
 
-    let remainingBeeps = beepCount;
+    const count = Number(byId("opt-alarm-count").value);
+    const interval = Number(byId("opt-alarm-interval").value);
+
+    return {
+        isEnabled: byId("opt-alarm-enabled").checked,
+        beepCount:
+            Number.isInteger(count) && count > 0
+                ? count
+                : ALARM_BEEP_COUNT,
+        interval:
+            Number.isFinite(interval) && interval >= 100
+                ? interval
+                : ALARM_BEEP_INTERVAL_MS
+    };
+}
+
+function playAlarm() {
+
+    const alarmSettings = getOptionAlarmSettings();
+
+    if (!alarmSettings.isEnabled)
+        return;
+
+    let remainingBeeps = alarmSettings.beepCount;
 
     const beep = () => {
 
@@ -1559,7 +1595,7 @@ function playAlarm(beepCount = ALARM_BEEP_COUNT) {
         remainingBeeps--;
 
         if (remainingBeeps > 0) {
-            setTimeout(beep, ALARM_BEEP_INTERVAL_MS);
+            setTimeout(beep, alarmSettings.interval);
         }
     };
 
@@ -1588,6 +1624,80 @@ function resetOptionAlarmStates() {
     optionAlarmStates.buy.signature = null;
     optionAlarmStates.offset.isHit = false;
     optionAlarmStates.offset.signature = null;
+}
+
+function getOptionPreferenceKey(id) {
+
+    return OPTION_PREFERENCES_STORAGE_PREFIX + id;
+}
+
+function saveOptionPreference(id, type) {
+
+    const el = byId(id);
+
+    if (!el)
+        return;
+
+    const value =
+        type === "checkbox"
+            ? String(el.checked)
+            : el.value;
+
+    localStorage.setItem(getOptionPreferenceKey(id), value);
+}
+
+function loadOptionPreferences() {
+
+    OPTION_PERSISTED_FIELDS.forEach(field => {
+
+        const el = byId(field.id);
+
+        if (!el)
+            return;
+
+        const value = localStorage.getItem(
+            getOptionPreferenceKey(field.id)
+        );
+
+        if (value === null)
+            return;
+
+        if (field.type === "checkbox") {
+            el.checked = value === "true";
+        } else {
+            el.value = value;
+        }
+    });
+
+    const settingsBody = byId("opt-settings-body");
+    const settingsToggle = byId("opt-settings-toggle");
+    const isSettingsOpen =
+        localStorage.getItem(
+            getOptionPreferenceKey("opt-settings-open")
+        ) === "true";
+
+    settingsBody.hidden = !isSettingsOpen;
+    settingsToggle.innerText = isSettingsOpen ? "-" : "+";
+}
+
+function bindOptionPreferencePersistence() {
+
+    OPTION_PERSISTED_FIELDS.forEach(field => {
+
+        const el = byId(field.id);
+
+        if (!el)
+            return;
+
+        const eventName =
+            field.type === "checkbox"
+                ? "change"
+                : "input";
+
+        el.addEventListener(eventName, () => {
+            saveOptionPreference(field.id, field.type);
+        });
+    });
 }
 
 function checkBuyCondition(
@@ -1732,6 +1842,9 @@ function startOptionMonitoringIfReady() {
     startOptionMonitoring(false);
 }
 
+loadOptionPreferences();
+bindOptionPreferencePersistence();
+
 byId("opt-start").onclick = () => startOptionMonitoring();
 
 byId("opt-stop")
@@ -1756,7 +1869,22 @@ byId("opt-symbol-b").onchange = async () => {
     updateAutoOptionValues();
     startOptionMonitoringIfReady();
 };
+byId("opt-settings-toggle").onclick = () => {
+
+    const body = byId("opt-settings-body");
+    const isOpening = body.hidden;
+
+    body.hidden = !isOpening;
+    byId("opt-settings-toggle").innerText = isOpening ? "-" : "+";
+    localStorage.setItem(
+        getOptionPreferenceKey("opt-settings-open"),
+        String(isOpening)
+    );
+};
 byId("opt-auto-values").onchange = updateAutoOptionValues;
+byId("opt-alarm-enabled").onchange = resetOptionAlarmStates;
+byId("opt-alarm-count").onchange = resetOptionAlarmStates;
+byId("opt-alarm-interval").onchange = resetOptionAlarmStates;
 byId("opt-stop-execution").onclick = () => {
 
     optionExecutionStopRequested = true;

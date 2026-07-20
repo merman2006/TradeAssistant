@@ -257,7 +257,8 @@
     font-size: 11px;
 }
 
-.option-auto-values {
+.option-auto-values,
+.option-check-row {
     grid-column: 1 / -1;
     display: flex;
     align-items: center;
@@ -267,10 +268,69 @@
     line-height: 1.2;
 }
 
-    .option-auto-values input {
+    .option-auto-values input,
+    .option-check-row input {
         width: 12px;
         height: 12px;
         margin: 0;
+    }
+
+.option-settings {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr);
+    align-items: center;
+    gap: 4px;
+    padding: 3px 4px;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    background: #f8fafc;
+    color: #334155;
+    font-size: 10px;
+}
+
+    .option-settings > button {
+        width: 18px;
+        height: 18px;
+        padding: 0;
+        border: 1px solid #cbd5e1;
+        border-radius: 4px;
+        background: #fff;
+        color: #1e293b;
+        cursor: pointer;
+        font-weight: bold;
+        line-height: 1;
+    }
+
+.option-settings-body {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 4px;
+    padding-top: 3px;
+    border-top: 1px solid #e5e7eb;
+}
+
+    .option-settings-body[hidden] {
+        display: none;
+    }
+
+    .option-settings-body label {
+        font-size: 10px;
+        white-space: nowrap;
+    }
+
+    .option-settings-body input[type="number"] {
+        width: 100%;
+        min-width: 0;
+        height: 22px;
+        padding: 3px 4px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        direction: ltr;
+        text-align: left;
+        font-size: 11px;
     }
 
 .option-positions {

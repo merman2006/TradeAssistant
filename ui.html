@@ -91,10 +91,28 @@
                 </select>
             </div>
 
-            <label class="option-auto-values">
-                <input id="opt-auto-values" type="checkbox" checked>
-                <span>پر کردن خودکار پریمیوم و بیشترین اسپرد</span>
-            </label>
+            <div class="option-settings">
+                <button id="opt-settings-toggle" type="button">+</button>
+                <span>تنظیمات</span>
+
+                <div id="opt-settings-body" class="option-settings-body" hidden>
+                    <label class="option-check-row">
+                        <input id="opt-auto-values" type="checkbox" checked>
+                        <span>پر کردن خودکار پریمیوم و بیشترین اسپرد</span>
+                    </label>
+
+                    <label class="option-check-row">
+                        <input id="opt-alarm-enabled" type="checkbox" checked>
+                        <span>آلارم فعال باشد</span>
+                    </label>
+
+                    <label for="opt-alarm-count">تعداد آلارم</label>
+                    <input id="opt-alarm-count" type="number" min="1" max="20" value="5">
+
+                    <label for="opt-alarm-interval">فاصله آلارم</label>
+                    <input id="opt-alarm-interval" type="number" min="100" step="50" value="500">
+                </div>
+            </div>
 
             <div id="option-symbols-status"></div>
         </div>
