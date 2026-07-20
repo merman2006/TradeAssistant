@@ -342,15 +342,31 @@
     }
 
     .option-settings-body .option-alarm-row.alarm-enabled {
-        grid-template-columns: auto 44px 58px;
+        grid-template-columns: auto auto minmax(0, 1fr);
     }
 
-    .option-settings-body .option-alarm-row input[hidden] {
+    .option-settings-body .option-alarm-field[hidden] {
         display: none;
     }
 
     .option-settings-body .option-alarm-row .option-check-row {
         grid-column: auto;
+    }
+
+    .option-settings-body .option-alarm-field {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        min-width: 0;
+        color: #475569;
+    }
+
+    .option-settings-body .option-alarm-field input {
+        width: 40px;
+    }
+
+    .option-settings-body .option-alarm-interval-field input {
+        width: 52px;
     }
 
     .option-settings-body #opt-settings-reset {

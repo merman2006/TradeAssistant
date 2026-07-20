@@ -1634,8 +1634,8 @@ function syncOptionAlarmControlsVisibility() {
         "alarm-enabled",
         isEnabled
     );
-    byId("opt-alarm-count").hidden = !isEnabled;
-    byId("opt-alarm-interval").hidden = !isEnabled;
+    byId("opt-alarm-count-field").hidden = !isEnabled;
+    byId("opt-alarm-interval-field").hidden = !isEnabled;
 }
 
 function getOptionPreferenceKey(id) {
