@@ -101,6 +101,16 @@
                         <span>پر کردن خودکار پریمیوم و بیشترین اسپرد</span>
                     </label>
 
+                    <label class="option-check-row">
+                        <input id="opt-auto-buy-buttons" type="checkbox" checked>
+                        <span>نمایش خودکار دکمه‌های خرید</span>
+                    </label>
+
+                    <label class="option-check-row">
+                        <input id="opt-sync-order-quantities" type="checkbox" checked>
+                        <span>برابر نگه داشتن تعدادهای خرید و فروش</span>
+                    </label>
+
                     <div id="opt-alarm-row" class="option-alarm-row">
                         <label class="option-check-row">
                             <input id="opt-alarm-enabled" type="checkbox" checked>
@@ -152,11 +162,18 @@
                     <label for="opt-buy-execution-count">تعداد اجرا</label>
                     <input id="opt-buy-execution-count" type="number" min="1" value="1">
 
-                    <label for="opt-buy-quantity">تعداد خرید</label>
-                    <input id="opt-buy-quantity" type="number" min="1" value="10">
+                    <label for="opt-buy-quantity">تعداد خرید A</label>
+                    <input id="opt-buy-quantity" type="number" min="0" value="10">
+
+                    <label for="opt-buy-sell-quantity">تعداد فروش B</label>
+                    <input id="opt-buy-sell-quantity" type="number" min="0" value="10">
 
                     <button id="opt-buy-order" class="buy-btn" type="button">
                         باز کردن موقعیت
+                    </button>
+
+                    <button id="opt-initial-position-order" class="buy-btn" type="button">
+                        موقعیت اول
                     </button>
 
                     <button id="opt-stop-execution" class="sell-btn" type="button" disabled>
@@ -189,8 +206,11 @@
                     <label for="opt-sell-execution-count">تعداد اجرا</label>
                     <input id="opt-sell-execution-count" type="number" min="1" value="1">
 
-                    <label for="opt-sell-quantity">تعداد فروش</label>
-                    <input id="opt-sell-quantity" type="number" min="1" value="10">
+                    <label for="opt-offset-buy-quantity">تعداد خرید B</label>
+                    <input id="opt-offset-buy-quantity" type="number" min="0" value="10">
+
+                    <label for="opt-sell-quantity">تعداد فروش A</label>
+                    <input id="opt-sell-quantity" type="number" min="0" value="10">
 
                     <button id="opt-sell-order" class="sell-btn" type="button">
                         آفست موقعیت

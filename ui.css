@@ -463,6 +463,7 @@
     }
 
     .option-order-fields #opt-buy-order,
+    .option-order-fields #opt-initial-position-order,
     .option-order-fields #opt-sell-order {
         grid-column: 1;
     }

@@ -1,16 +1,350 @@
 
 let selected = null;
 const brokerConfig = window.PPT_BROKER_CONFIG;
+const brokerAdapterFactory = window.PPT_BROKER_ADAPTERS;
 
 if (!brokerConfig) {
     throw new Error("Broker configuration was not loaded.");
 }
 
-const brokerApiUrl = endpoint =>
-    new URL(endpoint, brokerConfig.apiBaseUrl).toString();
+function createFallbackBrokerAdapter(config) {
 
-const getBrokerAuth = () =>
-    JSON.parse(localStorage.getItem(brokerConfig.authStorageKey));
+    if (config.type === "ephoenix") {
+        throw new Error(
+            "Broker adapter factory was not loaded. Reload the extension before using ephoenix."
+        );
+    }
+
+    const apiUrl = endpoint =>
+        new URL(endpoint, config.apiBaseUrl).toString();
+
+    const getAuth = () => {
+        const value = localStorage.getItem(config.authStorageKey);
+
+        if (!value)
+            return "";
+
+        try {
+            return JSON.parse(value);
+        } catch (_) {
+            return String(value || "").replace(/^"+|"+$/g, "");
+        }
+    };
+
+    const getFirstValue = (source, keys) => {
+        for (const key of keys) {
+            if (source?.[key] !== undefined && source?.[key] !== null)
+                return source[key];
+        }
+
+        return undefined;
+    };
+
+    const normalizeStrategy = strategy => ({
+        ...strategy,
+        label: getFirstValue(strategy, [
+            "label",
+            "title",
+            "Title",
+            "name",
+            "Name"
+        ]),
+        key: getFirstValue(strategy, [
+            "key",
+            "uniqueKey",
+            "UniqueKey",
+            "optionStrategyUniqueKey",
+            "OptionStrategyUniqueKey"
+        ]),
+        baseInstrumentId: getFirstValue(strategy, [
+            "baseInstrumentId",
+            "baseStrategyInstrumentId",
+            "BaseStrategyInstrumentId"
+        ]),
+        strategyInstrumentId: getFirstValue(strategy, [
+            "strategyInstrumentId",
+            "StrategyInstrumentId"
+        ]),
+        thirdInstrumentId: getFirstValue(strategy, [
+            "thirdInstrumentId",
+            "thirdStrategyInstrumentId",
+            "ThirdStrategyInstrumentId"
+        ])
+    });
+
+    const getArrayData = value => {
+        const data = getResponseData(value);
+
+        if (Array.isArray(data))
+            return data;
+
+        return [
+            data?.items,
+            data?.Items,
+            data?.list,
+            data?.List,
+            data?.records,
+            data?.Records,
+            data?.data,
+            data?.Data
+        ].find(Array.isArray) || [];
+    };
+
+    async function fetchJson(endpoint, options = {}) {
+        const response = await fetch(apiUrl(endpoint), options);
+        const text = await response.text();
+        let json = null;
+
+        if (text.trim()) {
+            try {
+                json = JSON.parse(text);
+            } catch (_) {
+                json = {
+                    message: text.trim()
+                };
+            }
+        }
+
+        if (!response.ok) {
+            throw new Error(
+                json?.message ||
+                json?.Message ||
+                json?.errorMessage ||
+                json?.ErrorMessage ||
+                json?.response?.message ||
+                json?.response?.Message ||
+                `خطای ${response.status} در ${endpoint}`
+            );
+        }
+
+        return {
+            response,
+            json
+        };
+    }
+
+    return {
+        name: config.name,
+        type: config.type,
+        supportsOptionStrategies: true,
+
+        isOptionPageVisible() {
+            return false;
+        },
+
+        async searchInstruments(query) {
+            const { json } = await fetchJson(
+                config.endpoints.searchInstruments +
+                "?filter=" + encodeURIComponent(query)
+            );
+
+            return json?.response?.data || [];
+        },
+
+        async placeStockOrder({ instrument, side, price, quantity }) {
+            const { json } = await fetchJson(
+                config.endpoints.orderEntry,
+                {
+                    method: "POST",
+                    credentials: "include",
+                    headers: {
+                        "content-type": "application/json",
+                        "authorization": getAuth()
+                    },
+                    body: JSON.stringify({
+                        PrincipalId: null,
+                        InstrumentId: instrument.instrumentId,
+                        ISensOM: side,
+                        YValiOmNSC: "Day",
+                        PLimSaiOM: price,
+                        QTitTotOM: quantity,
+                        QTitDvlOM: 0,
+                        extraInfo: JSON.stringify({ ark: crypto.randomUUID() }),
+                        ExecutionType: "Instant"
+                    })
+                }
+            );
+
+            return json;
+        },
+
+        async fetchOptionStrategies() {
+            if (!getAuth())
+                return [];
+
+            const { json } = await fetchJson(
+                config.endpoints.optionStrategies,
+                {
+                    method: "GET",
+                    credentials: "include",
+                    headers: {
+                        "content-type": "application/json",
+                        "authorization": getAuth()
+                    }
+                }
+            );
+
+            return getArrayData(json)
+                .map(normalizeStrategy)
+                .filter(strategy => strategy.key);
+        },
+
+        async placeOptionOrder({
+            instrumentId,
+            side,
+            price,
+            quantity,
+            strategyKey,
+            validityDate = null
+        }) {
+            const payload = {
+                PrincipalId: null,
+                InstrumentId: instrumentId,
+                ISensOM: side,
+                YValiOmNSC: "Day",
+                DValiOM: validityDate,
+                PLimSaiOM: price,
+                QTitTotOM: quantity,
+                QTitDvlOM: 0,
+                extraInfo: JSON.stringify({ ark: crypto.randomUUID() }),
+                ExecutionType: "Instant"
+            };
+
+            if (strategyKey) {
+                payload.optionStrategyUniqueKey = strategyKey;
+            }
+
+            const { response, json } = await fetchJson(
+                config.endpoints.orderEntry,
+                {
+                    method: "POST",
+                    credentials: "include",
+                    headers: {
+                        "content-type": "application/json",
+                        "authorization": getAuth()
+                    },
+                    body: JSON.stringify(payload)
+                }
+            );
+
+            if (json?.response?.successful === false) {
+                throw new Error(
+                    getResponseErrorMessage(
+                        json,
+                        "ثبت سفارش ناموفق بود."
+                    )
+                );
+            }
+
+            return {
+                response,
+                json
+            };
+        },
+
+        async createOptionStrategy({
+            instrumentIdA,
+            instrumentIdB,
+            quantity
+        }) {
+            const { response, json } = await fetchJson(
+                config.endpoints.optionStrategyCreate,
+                {
+                    method: "POST",
+                    credentials: "include",
+                    headers: {
+                        "content-type": "application/json",
+                        "authorization": getAuth()
+                    },
+                    body: JSON.stringify({
+                        strategyType: "BullCallSpread",
+                        baseStrategyInstrumentId: instrumentIdA,
+                        strategyInstrumentId: instrumentIdB,
+                        quantity,
+                        customerId: null,
+                        thirdStrategyInstrumentId: null
+                    })
+                }
+            );
+
+            return {
+                response,
+                json
+            };
+        },
+
+        getOptionSymbols() {
+            return Array
+                .from(document.querySelectorAll(
+                    `#sc-optionInstrumentFavoriteList > li[id^="${OPTION_INSTRUMENT_ID_PREFIX}"]`
+                ))
+                .map(item => {
+                    const instrumentId =
+                        item.id.slice(OPTION_INSTRUMENT_ID_PREFIX.length);
+                    const header = item.querySelector(
+                        "client-option-instruments-favorites-item-header main"
+                    );
+                    const symbol =
+                        header?.querySelector("label")?.innerText.trim();
+                    const description =
+                        header?.querySelector("span")?.innerText.trim();
+
+                    return {
+                        instrumentId,
+                        title: [symbol, description]
+                            .filter(Boolean)
+                            .join(" - ")
+                    };
+                })
+                .filter(item => item.instrumentId && item.title);
+        },
+
+        getSelectedOptionContainer(instrumentId) {
+            if (!instrumentId)
+                return null;
+
+            return document.getElementById(
+                OPTION_INSTRUMENT_ID_PREFIX + instrumentId
+            );
+        },
+
+        getOptionQuote(instrumentId) {
+            const container = this.getSelectedOptionContainer(instrumentId);
+            const bid = container?.querySelector(
+                'client-instrument-price-position-row[orderside="Buy"] .-is-price .-is-clickable'
+            );
+            const ask = container?.querySelector(
+                'client-instrument-price-position-row[orderside="Sell"] .-is-price .-is-clickable'
+            );
+
+            return {
+                bid: parseOptionNumber(bid?.innerText),
+                ask: parseOptionNumber(ask?.innerText)
+            };
+        },
+
+        getOptionPositionValue(instrumentId, columnId) {
+            if (!instrumentId)
+                return null;
+
+            const row = getOptionPositionRow(instrumentId);
+            const cell = row?.querySelector(
+                `[col-id="${columnId}"]`
+            );
+
+            return parseOptionNumber(cell?.innerText);
+        },
+
+        async isOptionBuyOrderExecuted() {
+            await delay(1000);
+            return true;
+        }
+    };
+}
+
+const brokerAdapter = brokerAdapterFactory
+    ? brokerAdapterFactory.create(brokerConfig)
+    : createFallbackBrokerAdapter(brokerConfig);
 const root = document
     .getElementById("ppt-extension-root")
     .shadowRoot;
@@ -18,12 +352,16 @@ const root = document
 const byId = id => root.getElementById(id);
 const DERIVATIVE_MAIN_HOSTS = [
     "khobregan.tsetab.ir",
-    "khobregan-red.tsetab.ir"
+    "khobregan-red.tsetab.ir",
+    "gs.ephoenix.ir"
 ];
 const DERIVATIVE_MAIN_HASH = "#/stock/derivative/main";
 let derivativePanelManualOverride = false;
 
 function isDerivativeMainPage() {
+
+    if (brokerAdapter.isOptionPageVisible?.())
+        return true;
 
     return DERIVATIVE_MAIN_HOSTS.includes(window.location.hostname) &&
         window.location.hash
@@ -46,16 +384,7 @@ function syncDerivativeTabVisibility() {
 
 async function search(q) {
 
-    const res = await fetch(
-        brokerApiUrl(
-            brokerConfig.endpoints.searchInstruments +
-            "?filter=" + encodeURIComponent(q)
-        )
-    );
-
-    const json = await res.json();
-
-    return json?.response?.data || [];
+    return brokerAdapter.searchInstruments(q);
 }
 
 async function send(side) {
@@ -67,34 +396,14 @@ async function send(side) {
         const price = +byId("price").value;
         const qty = +byId("qty").value;
 
-        const auth = getBrokerAuth();
+        const result = await brokerAdapter.placeStockOrder({
+            instrument: selected,
+            side,
+            price,
+            quantity: qty
+        });
 
-        const payload = {
-            PrincipalId: null,
-            InstrumentId: selected.instrumentId,
-            ISensOM: side,
-            YValiOmNSC: "Day",
-            PLimSaiOM: price,
-            QTitTotOM: qty,
-            QTitDvlOM: 0,
-            extraInfo: JSON.stringify({ ark: crypto.randomUUID() }),
-            ExecutionType: "Instant"
-        };
-
-        const res = await fetch(
-            brokerApiUrl(brokerConfig.endpoints.orderEntry),
-            {
-                method: "POST",
-                credentials: "include",
-                headers: {
-                    "content-type": "application/json",
-                    "authorization": auth
-                },
-                body: JSON.stringify(payload)
-            }
-        );
-
-        log.innerText = JSON.stringify(await res.json(), null, 2);
+        log.innerText = JSON.stringify(result, null, 2);
 
     } catch (e) {
         log.innerText = e.message;
@@ -259,6 +568,8 @@ const optionAlarmStates = {
 const OPTION_PREFERENCES_STORAGE_PREFIX = "ppt-option-preference:";
 const OPTION_PERSISTED_FIELDS = [
     { id: "opt-auto-values", type: "checkbox" },
+    { id: "opt-auto-buy-buttons", type: "checkbox" },
+    { id: "opt-sync-order-quantities", type: "checkbox" },
     { id: "opt-alarm-enabled", type: "checkbox" },
     { id: "opt-alarm-count", type: "value" },
     { id: "opt-alarm-interval", type: "value" },
@@ -267,6 +578,8 @@ const OPTION_PERSISTED_FIELDS = [
     { id: "opt-buy-execution-count", type: "value" },
     { id: "opt-sell-execution-count", type: "value" },
     { id: "opt-buy-quantity", type: "value" },
+    { id: "opt-buy-sell-quantity", type: "value" },
+    { id: "opt-offset-buy-quantity", type: "value" },
     { id: "opt-sell-quantity", type: "value" }
 ];
 
@@ -289,34 +602,7 @@ const OPTION_STRATEGY_TYPE_LABELS = {
 
 function getOptionSymbols() {
 
-    return Array
-        .from(document.querySelectorAll(
-            `#sc-optionInstrumentFavoriteList > li[id^="${OPTION_INSTRUMENT_ID_PREFIX}"]`
-        ))
-        .map(item => {
-
-            const instrumentId =
-                item.id.slice(OPTION_INSTRUMENT_ID_PREFIX.length);
-
-            const header =
-                item.querySelector(
-                    "client-option-instruments-favorites-item-header main"
-                );
-
-            const symbol =
-                header?.querySelector("label")?.innerText.trim();
-
-            const description =
-                header?.querySelector("span")?.innerText.trim();
-
-            return {
-                instrumentId,
-                title: [symbol, description]
-                    .filter(Boolean)
-                    .join(" - ")
-            };
-        })
-        .filter(item => item.instrumentId && item.title);
+    return brokerAdapter.getOptionSymbols();
 }
 
 function fillOptionSymbolSelect(select, symbols, previousValue, defaultIndex) {
@@ -338,9 +624,9 @@ function fillOptionSymbolSelect(select, symbols, previousValue, defaultIndex) {
     }
 }
 
-function refreshOptionSymbols(autoStartMonitoring = true) {
+async function refreshOptionSymbols(autoStartMonitoring = true) {
 
-    const symbols = getOptionSymbols();
+    const symbols = await getOptionSymbols();
     const signature = symbols
         .map(symbol => `${symbol.instrumentId}:${symbol.title}`)
         .join("|");
@@ -362,14 +648,19 @@ function refreshOptionSymbols(autoStartMonitoring = true) {
 
     if (symbols.length) {
         status.innerText = "";
-        updateAutoOptionValues();
+        await updateAutoOptionValues();
+        syncInitialPositionButtonVisibility();
         if (autoStartMonitoring) {
             startOptionMonitoringIfReady();
         }
     } else {
+        const message = brokerAdapter.getOptionSymbolsEmptyMessage?.() ||
+            "ابتدا قراردادهای موردنظر را به لیست نمادهای صفحه اضافه کنید.";
+
         symbolA.innerHTML = '<option value="">نمادی در صفحه پیدا نشد</option>';
         symbolB.innerHTML = '<option value="">نمادی در صفحه پیدا نشد</option>';
-        status.innerText = "ابتدا قراردادهای موردنظر را به لیست نمادهای صفحه اضافه کنید.";
+        status.innerText = message;
+        syncInitialPositionButtonVisibility();
     }
 }
 
@@ -467,7 +758,52 @@ function getOptionPositionRow(instrumentId) {
     );
 }
 
+function syncInitialPositionButtonVisibility() {
+
+    const initialButton = byId("opt-initial-position-order");
+    const openButton = byId("opt-buy-order");
+
+    if (!initialButton || !openButton)
+        return;
+
+    if (!byId("opt-auto-buy-buttons")?.checked) {
+        initialButton.hidden = false;
+        openButton.hidden = false;
+        return;
+    }
+
+    if (!isParsianLikeBroker()) {
+        initialButton.hidden = true;
+        openButton.hidden = false;
+        return;
+    }
+
+    const instrumentIdA = byId("opt-symbol-a").value;
+    const instrumentIdB = byId("opt-symbol-b").value;
+
+    if (!instrumentIdA || !instrumentIdB) {
+        initialButton.hidden = true;
+        openButton.hidden = false;
+        return;
+    }
+
+    const hasBothPositions =
+        !!getOptionPositionRow(instrumentIdA) &&
+        !!getOptionPositionRow(instrumentIdB);
+
+    initialButton.hidden = hasBothPositions;
+    openButton.hidden = !hasBothPositions;
+
+    if (!hasBothPositions) {
+        ensureOptionPositionsTabLoaded();
+    }
+}
+
 function getOptionPositionValue(instrumentId, columnId) {
+
+    if (brokerAdapter.getOptionPositionValue) {
+        return brokerAdapter.getOptionPositionValue(instrumentId, columnId);
+    }
 
     const row = getOptionPositionRow(instrumentId);
     const cell = row?.querySelector(
@@ -477,7 +813,7 @@ function getOptionPositionValue(instrumentId, columnId) {
     return parseOptionNumber(cell?.innerText);
 }
 
-function updateAutoOptionValues() {
+async function updateAutoOptionValues() {
 
     if (!byId("opt-auto-values")?.checked)
         return;
@@ -487,6 +823,27 @@ function updateAutoOptionValues() {
 
     if (!instrumentIdA || !instrumentIdB)
         return;
+
+    if (brokerAdapter.getOptionAutoValues) {
+        const values = brokerAdapter.getOptionAutoValues(
+            instrumentIdA,
+            instrumentIdB
+        );
+
+        if (values?.premium !== null && values?.premium !== undefined) {
+            byId("opt-premium").value = formatOptionAutoValue(
+                values.premium
+            );
+        }
+
+        if (values?.maxValue !== null && values?.maxValue !== undefined) {
+            byId("opt-max-value").value = formatOptionAutoValue(
+                values.maxValue
+            );
+        }
+
+        return;
+    }
 
     const positionRowA = getOptionPositionRow(instrumentIdA);
     const positionRowB = getOptionPositionRow(instrumentIdB);
@@ -534,6 +891,11 @@ function findStrategyKey(value) {
     return value?.match(OPTION_STRATEGY_KEY_PATTERN)?.[0] || "";
 }
 
+function normalizeOptionStrategyKey(value) {
+
+    return String(value || "").trim();
+}
+
 function getOptionStrategyTypeLabel(type) {
 
     return OPTION_STRATEGY_TYPE_LABELS[type] ||
@@ -545,6 +907,9 @@ function getOptionStrategyTypeLabel(type) {
 }
 
 function getOptionStrategyTitle(strategy) {
+
+    if (strategy.label)
+        return strategy.label;
 
     if (strategy.title)
         return strategy.title;
@@ -598,40 +963,20 @@ function getResponseErrorMessage(result, fallbackMessage) {
 
 async function fetchOptionStrategies() {
 
-    const auth = getBrokerAuth();
-    const response = await fetch(
-        brokerApiUrl(brokerConfig.endpoints.optionStrategies),
-        {
-            method: "GET",
-            credentials: "include",
-            headers: {
-                "content-type": "application/json",
-                "authorization": auth
-            }
-        }
-    );
-
-    const json = await response.json();
-
-    if (!response.ok) {
-        throw new Error(
-            json?.message ||
-            json?.response?.message ||
-            "دریافت استراتژی‌ها ناموفق بود."
-        );
-    }
-
-    const data = getResponseData(json);
+    const data = await brokerAdapter.fetchOptionStrategies();
 
     return (Array.isArray(data) ? data : [])
         .map(strategy => ({
             label: normalizeOptionStrategyLabel(
                 getOptionStrategyTitle(strategy)
             ),
-            key: strategy.uniqueKey,
-            baseInstrumentId: strategy.baseStrategyInstrumentId,
-            strategyInstrumentId: strategy.strategyInstrumentId,
-            thirdInstrumentId: strategy.thirdStrategyInstrumentId
+            key: normalizeOptionStrategyKey(strategy.key || strategy.uniqueKey),
+            baseInstrumentId:
+                String(strategy.baseInstrumentId || strategy.baseStrategyInstrumentId || ""),
+            strategyInstrumentId:
+                String(strategy.strategyInstrumentId || ""),
+            thirdInstrumentId:
+                String(strategy.thirdInstrumentId || strategy.thirdStrategyInstrumentId || "")
         }))
         .filter(strategy => strategy.label && strategy.key);
 }
@@ -723,6 +1068,12 @@ function distinctOptionStrategies(strategies) {
 
 function getOptionStrategies() {
 
+    if (brokerAdapter.getOptionStrategies) {
+        return distinctOptionStrategies(
+            brokerAdapter.getOptionStrategies()
+        );
+    }
+
     const strategySelector = OPTION_STRATEGY_SELECTORS
         .flatMap(selector => [
             `${selector} .ng-option-label`,
@@ -810,11 +1161,17 @@ function autoSelectOptionStrategy(select, strategies, instrumentIdA, instrumentI
 
     const currentOption = select.selectedOptions[0];
     const currentStrategy = strategies.find(strategy =>
-        strategy.key && strategy.key === currentOption?.dataset.strategyKey
+            normalizeOptionStrategyKey(strategy.key) && (
+            normalizeOptionStrategyKey(strategy.key) ===
+                normalizeOptionStrategyKey(currentOption?.dataset.strategyKey) ||
+            normalizeOptionStrategyLabel(strategy.label) ===
+                normalizeOptionStrategyLabel(currentOption?.innerText)
+        )
     );
 
     if (
         !symbolsChanged &&
+        currentOption?.dataset.strategyKey &&
         getOptionStrategyMatchScore(currentStrategy || {}, instrumentIdA, instrumentIdB)
     ) {
         return;
@@ -833,6 +1190,13 @@ function autoSelectOptionStrategy(select, strategies, instrumentIdA, instrumentI
         .filter(item => item.score > 0)
         .sort((first, second) => {
 
+            const firstHasKey = !!first.strategy.key;
+            const secondHasKey = !!second.strategy.key;
+
+            if (firstHasKey !== secondHasKey) {
+                return firstHasKey ? -1 : 1;
+            }
+
             if (first.isInDefaultSelect !== second.isInDefaultSelect) {
                 return first.isInDefaultSelect ? -1 : 1;
             }
@@ -841,7 +1205,29 @@ function autoSelectOptionStrategy(select, strategies, instrumentIdA, instrumentI
         })[0]?.strategy;
 
     if (matchedStrategy) {
-        select.value = matchedStrategy.key || matchedStrategy.label;
+        const matchedKey = normalizeOptionStrategyKey(matchedStrategy.key);
+        const matchedLabel = normalizeOptionStrategyLabel(matchedStrategy.label);
+        const matchedOption = Array
+            .from(select.options)
+            .find(option =>
+                (
+                    matchedKey &&
+                    normalizeOptionStrategyKey(option.dataset.strategyKey) === matchedKey
+                ) ||
+                (
+                    matchedKey &&
+                    normalizeOptionStrategyKey(option.value) === matchedKey
+                ) ||
+                (
+                    matchedLabel &&
+                    normalizeOptionStrategyLabel(option.innerText) === matchedLabel
+                )
+            );
+
+        if (matchedOption) {
+            select.value = matchedOption.value;
+        }
+
         return;
     }
 
@@ -854,6 +1240,21 @@ function autoSelectOptionStrategy(select, strategies, instrumentIdA, instrumentI
 async function refreshOptionStrategies() {
 
     const select = byId("opt-strategy");
+
+    if (brokerAdapter.supportsOptionStrategies === false) {
+        if (optionStrategiesSignature === "unsupported")
+            return;
+
+        optionStrategiesSignature = "unsupported";
+        select.innerHTML = "";
+
+        const option = document.createElement("option");
+        option.value = "";
+        option.innerText = "برای این کارگزاری نیاز نیست";
+        select.appendChild(option);
+        return;
+    }
+
     const cachedStrategies = Array
         .from(select.options)
         .filter(option => option.value)
@@ -879,7 +1280,11 @@ async function refreshOptionStrategies() {
 
     } catch (error) {
 
-        console.warn("Could not fetch option strategies", error);
+        if (!isTransientOptionStrategyError(error)) {
+            console.warn("Could not fetch option strategies", error);
+        }
+    } finally {
+
         optionStrategiesRequest = null;
     }
 
@@ -903,7 +1308,14 @@ async function refreshOptionStrategies() {
     ]);
 
     const signature = strategies
-        .map(strategy => `${strategy.key}:${strategy.label}`)
+        .map(strategy => [
+            strategy.key,
+            strategy.label,
+            strategy.baseInstrumentId,
+            strategy.strategyInstrumentId,
+            strategy.thirdInstrumentId,
+            strategy.isInDefaultSelect ? "dom" : "api"
+        ].join(":"))
         .join("|") + `::${selectedSymbolsSignature}`;
 
     if (signature === optionStrategiesSignature)
@@ -935,11 +1347,13 @@ async function refreshOptionStrategies() {
     strategies.forEach(strategy => {
 
         const option = document.createElement("option");
-        option.value = strategy.key || strategy.label;
+        const strategyKey = normalizeOptionStrategyKey(strategy.key);
+
+        option.value = strategyKey || strategy.label;
         option.innerText = strategy.label;
 
-        if (strategy.key) {
-            option.dataset.strategyKey = strategy.key;
+        if (strategyKey) {
+            option.dataset.strategyKey = strategyKey;
         }
 
         if (strategy.baseInstrumentId) {
@@ -986,6 +1400,21 @@ async function refreshOptionStrategies() {
     );
 }
 
+function isTransientOptionStrategyError(error) {
+
+    const message = String(error?.message || "");
+
+    return window.location.href.includes("/login") ||
+        (
+            brokerConfig.authStorageKey &&
+            !localStorage.getItem(brokerConfig.authStorageKey)
+        ) ||
+        (
+            error instanceof SyntaxError &&
+            message.includes("Unexpected end of JSON input")
+        );
+}
+
 function getSelectedOptionStrategyKey() {
 
     const strategy = byId("opt-strategy");
@@ -1002,6 +1431,10 @@ function getSelectedOptionContainer(selectId) {
     if (!instrumentId)
         return null;
 
+    if (brokerAdapter.getSelectedOptionContainer) {
+        return brokerAdapter.getSelectedOptionContainer(instrumentId);
+    }
+
     return document.getElementById(
         OPTION_INSTRUMENT_ID_PREFIX + instrumentId
     );
@@ -1009,12 +1442,7 @@ function getSelectedOptionContainer(selectId) {
 
 async function isOptionBuyOrderExecuted(orderInfo) {
 
-    // TODO: بعداً با API سفارش‌ها، انجام واقعی خرید نماد A بررسی شود.
-    console.log("Waiting before sending option B sell order", orderInfo);
-
-    await delay(1000);
-
-    return true;
+    return brokerAdapter.isOptionBuyOrderExecuted(orderInfo);
 }
 
 function delay(milliseconds) {
@@ -1085,7 +1513,8 @@ async function sendOptionBuyOrder() {
     const instrumentIdB = byId("opt-symbol-b").value;
     const selectedStrategy = byId("opt-strategy").value;
     const optionStrategyUniqueKey = getSelectedOptionStrategyKey();
-    const quantity = +byId("opt-buy-quantity").value;
+    const buyQuantityA = +byId("opt-buy-quantity").value;
+    const sellQuantityB = +byId("opt-buy-sell-quantity").value;
     const executionCount = +byId("opt-buy-execution-count").value;
 
     status.classList.remove("success");
@@ -1100,19 +1529,29 @@ async function sendOptionBuyOrder() {
         return;
     }
 
-    if (!selectedStrategy) {
+    if (brokerAdapter.supportsOptionStrategies !== false && !selectedStrategy) {
         status.innerText = "استراتژی را انتخاب کنید.";
         return;
     }
 
-    if (!optionStrategyUniqueKey) {
+    if (brokerAdapter.supportsOptionStrategies !== false && !optionStrategyUniqueKey) {
         status.innerText =
             "کلید استراتژی از کمبوباکس صفحه قابل خواندن نیست؛ مقدار نمایشی برای ارسال سفارش کافی نیست.";
         return;
     }
 
-    if (!Number.isInteger(quantity) || quantity <= 0) {
-        status.innerText = "تعداد خرید را به‌صورت عدد صحیح و بزرگ‌تر از صفر وارد کنید.";
+    if (!Number.isInteger(buyQuantityA) || buyQuantityA < 0) {
+        status.innerText = "تعداد خرید A را به‌صورت عدد صحیح و صفر یا بزرگ‌تر وارد کنید.";
+        return;
+    }
+
+    if (!Number.isInteger(sellQuantityB) || sellQuantityB < 0) {
+        status.innerText = "تعداد فروش B را به‌صورت عدد صحیح و صفر یا بزرگ‌تر وارد کنید.";
+        return;
+    }
+
+    if (buyQuantityA === 0 && sellQuantityB === 0) {
+        status.innerText = "حداقل یکی از تعدادهای خرید A یا فروش B باید بزرگ‌تر از صفر باشد.";
         return;
     }
 
@@ -1130,7 +1569,6 @@ async function sendOptionBuyOrder() {
         progress.innerText = "در حال اجرا...";
         status.innerText = "";
 
-        const auth = getBrokerAuth();
         let completedCount = 0;
 
         for (let step = 1; step <= executionCount; step++) {
@@ -1169,60 +1607,43 @@ async function sendOptionBuyOrder() {
                 return;
             }
 
-            progress.innerText =
-                `در حال ثبت خرید ${step}/${executionCount}...`;
+            let result = null;
 
-            const payload = {
-                PrincipalId: null,
-                InstrumentId: instrumentIdA,
-                ISensOM: "Buy",
-                YValiOmNSC: "Day",
-                PLimSaiOM: askA,
-                QTitTotOM: quantity,
-                QTitDvlOM: 0,
-                extraInfo: JSON.stringify({ ark: crypto.randomUUID() }),
-                optionStrategyUniqueKey,
-                ExecutionType: "Instant"
-            };
+            if (buyQuantityA > 0) {
+                progress.innerText =
+                    `در حال ثبت خرید ${step}/${executionCount}...`;
 
-            const response = await fetch(
-                brokerApiUrl(brokerConfig.endpoints.orderEntry),
-                {
-                    method: "POST",
-                    credentials: "include",
-                    headers: {
-                        "content-type": "application/json",
-                        "authorization": auth
-                    },
-                    body: JSON.stringify(payload)
-                }
-            );
+                const orderResult = await brokerAdapter.placeOptionOrder({
+                    instrumentId: instrumentIdA,
+                    side: "Buy",
+                    price: askA,
+                    quantity: buyQuantityA,
+                    strategyKey: optionStrategyUniqueKey
+                });
 
-            const result = await response.json();
-
-            if (!response.ok || result?.response?.successful === false) {
-                throw new Error(
-                    getResponseErrorMessage(
-                        result,
-                        "ثبت سفارش خرید ناموفق بود."
-                    )
-                );
+                result = orderResult.json;
             }
 
             if (optionExecutionStopRequested) {
                 status.innerText =
-                    "سفارش خرید ثبت شد؛ ادامه اجرا قبل از ارسال فروش متوقف شد.";
+                    buyQuantityA > 0
+                        ? "سفارش خرید ثبت شد؛ ادامه اجرا قبل از ارسال فروش متوقف شد."
+                        : "ادامه اجرا قبل از ارسال فروش متوقف شد.";
                 return;
             }
 
-            status.innerText = "در حال بررسی انجام شدن خرید نماد A...";
+            let buyExecuted = true;
 
-            const buyExecuted = await isOptionBuyOrderExecuted({
-                instrumentId: instrumentIdA,
-                price: askA,
-                quantity,
-                orderResponse: result
-            });
+            if (buyQuantityA > 0) {
+                status.innerText = "در حال بررسی انجام شدن خرید نماد A...";
+
+                buyExecuted = await isOptionBuyOrderExecuted({
+                    instrumentId: instrumentIdA,
+                    price: askA,
+                    quantity: buyQuantityA,
+                    orderResponse: result
+                });
+            }
 
             if (!buyExecuted) {
                 status.innerText =
@@ -1232,55 +1653,29 @@ async function sendOptionBuyOrder() {
 
             if (optionExecutionStopRequested) {
                 status.innerText =
-                    "سفارش خرید انجام شد؛ ادامه اجرا قبل از ارسال فروش متوقف شد.";
+                    buyQuantityA > 0
+                        ? "سفارش خرید انجام شد؛ ادامه اجرا قبل از ارسال فروش متوقف شد."
+                        : "ادامه اجرا قبل از ارسال فروش متوقف شد.";
                 return;
             }
 
             const latestBidB = getBidB();
 
-            if (!latestBidB) {
+            if (sellQuantityB > 0 && !latestBidB) {
                 throw new Error("قیمت سرخط خرید نماد B پیدا نشد.");
             }
 
-            progress.innerText =
-                `در حال ثبت فروش ${step}/${executionCount}...`;
+            if (sellQuantityB > 0) {
+                progress.innerText =
+                    `در حال ثبت فروش ${step}/${executionCount}...`;
 
-            const sellPayload = {
-                PrincipalId: null,
-                InstrumentId: instrumentIdB,
-                ISensOM: "Sell",
-                YValiOmNSC: "Day",
-                DValiOM: null,
-                PLimSaiOM: latestBidB,
-                QTitTotOM: quantity,
-                QTitDvlOM: 0,
-                extraInfo: JSON.stringify({ ark: crypto.randomUUID() }),
-                optionStrategyUniqueKey,
-                ExecutionType: "Instant"
-            };
-
-            const sellResponse = await fetch(
-                brokerApiUrl(brokerConfig.endpoints.orderEntry),
-                {
-                    method: "POST",
-                    credentials: "include",
-                    headers: {
-                        "content-type": "application/json",
-                        "authorization": auth
-                    },
-                    body: JSON.stringify(sellPayload)
-                }
-            );
-
-            const sellResult = await sellResponse.json();
-
-            if (!sellResponse.ok || sellResult?.response?.successful === false) {
-                throw new Error(
-                    getResponseErrorMessage(
-                        sellResult,
-                        "ثبت سفارش فروش نماد B ناموفق بود."
-                    )
-                );
+                await brokerAdapter.placeOptionOrder({
+                    instrumentId: instrumentIdB,
+                    side: "Sell",
+                    price: latestBidB,
+                    quantity: sellQuantityB,
+                    strategyKey: optionStrategyUniqueKey
+                });
             }
 
             completedCount++;
@@ -1315,6 +1710,300 @@ async function sendOptionBuyOrder() {
     }
 }
 
+function isParsianLikeBroker() {
+
+    return brokerConfig.type === "parsian" ||
+        brokerConfig.type === "khobregan";
+}
+
+function findStrategyKeyInResponse(value, seen = new Set()) {
+
+    if (value === null || value === undefined)
+        return "";
+
+    if (typeof value === "string")
+        return findStrategyKey(value);
+
+    if (typeof value !== "object")
+        return "";
+
+    if (seen.has(value))
+        return "";
+
+    seen.add(value);
+
+    const directKey = [
+        value.key,
+        value.uniqueKey,
+        value.UniqueKey,
+        value.optionStrategyUniqueKey,
+        value.OptionStrategyUniqueKey
+    ]
+        .map(item => normalizeOptionStrategyKey(item))
+        .find(Boolean);
+
+    if (directKey)
+        return directKey;
+
+    for (const item of Object.values(value)) {
+        const key = findStrategyKeyInResponse(item, seen);
+
+        if (key)
+            return key;
+    }
+
+    return "";
+}
+
+async function createInitialOptionStrategy({
+    instrumentIdA,
+    instrumentIdB,
+    quantity
+}) {
+
+    if (!brokerAdapter.createOptionStrategy) {
+        throw new Error("ساخت استراتژی برای این کارگزاری پشتیبانی نمی‌شود.");
+    }
+
+    const { json } = await brokerAdapter.createOptionStrategy({
+        instrumentIdA,
+        instrumentIdB,
+        quantity
+    });
+
+    const responseKey = findStrategyKeyInResponse(json);
+
+    if (responseKey)
+        return responseKey;
+
+    optionStrategiesSignature = null;
+
+    const strategies = await fetchOptionStrategies();
+    const matchedStrategy = strategies
+        .map(strategy => ({
+            strategy,
+            score: getOptionStrategyMatchScore(
+                strategy,
+                instrumentIdA,
+                instrumentIdB
+            )
+        }))
+        .filter(item => item.score > 0)
+        .sort((first, second) => second.score - first.score)[0]?.strategy;
+
+    return normalizeOptionStrategyKey(matchedStrategy?.key);
+}
+
+async function sendInitialOptionPositionOrder() {
+
+    await refreshOptionStrategies();
+
+    const button = byId("opt-initial-position-order");
+    const stopButton = byId("opt-stop-execution");
+    const progress = byId("opt-execution-progress");
+    const status = byId("option-symbols-status");
+    const instrumentIdA = byId("opt-symbol-a").value;
+    const instrumentIdB = byId("opt-symbol-b").value;
+    const buyQuantityA = +byId("opt-buy-quantity").value;
+    const sellQuantityB = +byId("opt-buy-sell-quantity").value;
+    const executionCount = +byId("opt-buy-execution-count").value;
+
+    status.classList.remove("success");
+
+    if (!isParsianLikeBroker()) {
+        status.innerText = "موقعیت اول فقط برای پارسیان و خبرگان فعال است.";
+        return;
+    }
+
+    if (!instrumentIdA) {
+        status.innerText = "نماد A را انتخاب کنید.";
+        return;
+    }
+
+    if (!instrumentIdB) {
+        status.innerText = "نماد B را انتخاب کنید.";
+        return;
+    }
+
+    if (!Number.isInteger(buyQuantityA) || buyQuantityA < 0) {
+        status.innerText = "تعداد خرید A را به‌صورت عدد صحیح و صفر یا بزرگ‌تر وارد کنید.";
+        return;
+    }
+
+    if (!Number.isInteger(sellQuantityB) || sellQuantityB < 0) {
+        status.innerText = "تعداد فروش B را به‌صورت عدد صحیح و صفر یا بزرگ‌تر وارد کنید.";
+        return;
+    }
+
+    if (buyQuantityA === 0 && sellQuantityB === 0) {
+        status.innerText = "حداقل یکی از تعدادهای خرید A یا فروش B باید بزرگ‌تر از صفر باشد.";
+        return;
+    }
+
+    if (!Number.isInteger(executionCount) || executionCount <= 0) {
+        status.innerText = "تعداد اجرا را به‌صورت عدد صحیح و بزرگ‌تر از صفر وارد کنید.";
+        return;
+    }
+
+    try {
+
+        optionExecutionStopRequested = false;
+        button.disabled = true;
+        stopButton.disabled = false;
+        progress.innerText = "در حال اجرای موقعیت اول...";
+        status.innerText = "";
+
+        let completedCount = 0;
+
+        for (let step = 1; step <= executionCount; step++) {
+
+            if (optionExecutionStopRequested) {
+                status.innerText =
+                    completedCount
+                        ? `${completedCount} اجرای موقعیت اول انجام شد؛ ادامه اجرا متوقف شد.`
+                        : "اجرای موقعیت اول متوقف شد.";
+                return;
+            }
+
+            const askA = getAskA();
+            const bidB = getBidB();
+
+            if (!askA) {
+                status.innerText = "قیمت سرخط فروش نماد A پیدا نشد.";
+                return;
+            }
+
+            if (!bidB) {
+                status.innerText = "قیمت سرخط خرید نماد B پیدا نشد.";
+                return;
+            }
+
+            checkBuyCondition(askA, bidB);
+
+            if (!getBuyConditionState(askA, bidB).isHit) {
+                status.innerText =
+                    completedCount
+                        ? `${completedCount} اجرای موقعیت اول انجام شد؛ چون BuyReturn دیگر مناسب نیست اجرای بعدی متوقف شد.`
+                        : "BuyReturn در وضعیت مناسب نیست؛ موقعیت اول اجرا نشد.";
+                return;
+            }
+
+            let buyResult = null;
+
+            if (buyQuantityA > 0) {
+                progress.innerText =
+                    `در حال ثبت خرید اولیه ${step}/${executionCount}...`;
+
+                const orderResult = await brokerAdapter.placeOptionOrder({
+                    instrumentId: instrumentIdA,
+                    side: "Buy",
+                    price: askA,
+                    quantity: buyQuantityA,
+                    strategyKey: null
+                });
+
+                buyResult = orderResult.json;
+            }
+
+            if (optionExecutionStopRequested) {
+                status.innerText =
+                    buyQuantityA > 0
+                        ? "سفارش خرید اولیه ثبت شد؛ ادامه قبل از ساخت استراتژی متوقف شد."
+                        : "ادامه قبل از ساخت استراتژی متوقف شد.";
+                return;
+            }
+
+            let buyExecuted = true;
+
+            if (buyQuantityA > 0) {
+                status.innerText = "در حال بررسی انجام شدن خرید اولیه...";
+
+                buyExecuted = await isOptionBuyOrderExecuted({
+                    instrumentId: instrumentIdA,
+                    price: askA,
+                    quantity: buyQuantityA,
+                    orderResponse: buyResult
+                });
+            }
+
+            if (!buyExecuted) {
+                status.innerText =
+                    "سفارش خرید اولیه ثبت شد؛ تا انجام شدن خرید، ساخت استراتژی و فروش انجام نشد.";
+                return;
+            }
+
+            progress.innerText =
+                `در حال ساخت استراتژی ${step}/${executionCount}...`;
+
+            const strategyKey = await createInitialOptionStrategy({
+                instrumentIdA,
+                instrumentIdB,
+                quantity: buyQuantityA || sellQuantityB,
+                buyOrderResponse: buyResult
+            });
+
+            if (!strategyKey) {
+                throw new Error("ساخت استراتژی انجام شد ولی کلید استراتژی برنگشت.");
+            }
+
+            if (optionExecutionStopRequested) {
+                status.innerText =
+                    "استراتژی ساخته شد؛ ادامه قبل از ارسال فروش متوقف شد.";
+                return;
+            }
+
+            const latestBidB = getBidB();
+
+            if (sellQuantityB > 0 && !latestBidB) {
+                throw new Error("قیمت سرخط خرید نماد B پیدا نشد.");
+            }
+
+            if (sellQuantityB > 0) {
+                progress.innerText =
+                    `در حال ثبت فروش ${step}/${executionCount}...`;
+
+                await brokerAdapter.placeOptionOrder({
+                    instrumentId: instrumentIdB,
+                    side: "Sell",
+                    price: latestBidB,
+                    quantity: sellQuantityB,
+                    strategyKey
+                });
+            }
+
+            completedCount++;
+            status.innerText =
+                `${completedCount} از ${executionCount} اجرای موقعیت اول انجام شد.`;
+
+            if (optionExecutionStopRequested) {
+                status.innerText =
+                    `${completedCount} اجرای موقعیت اول انجام شد؛ ادامه متوقف شد.`;
+                return;
+            }
+
+            await delay(1000);
+        }
+
+        status.innerText =
+            `${completedCount} اجرای موقعیت اول با موفقیت انجام شد.`;
+        status.classList.add("success");
+        byId("opt-initial-position-order").hidden = true;
+        byId("opt-buy-order").hidden = false;
+
+    } catch (error) {
+
+        status.innerText = error.message;
+        status.classList.remove("success");
+
+    } finally {
+
+        button.disabled = false;
+        stopButton.disabled = true;
+        stopButton.innerText = "توقف اجرا";
+        progress.innerText = "";
+    }
+}
+
 async function sendOptionOffsetOrder() {
 
     await refreshOptionStrategies();
@@ -1327,7 +2016,8 @@ async function sendOptionOffsetOrder() {
     const instrumentIdB = byId("opt-symbol-b").value;
     const selectedStrategy = byId("opt-strategy").value;
     const optionStrategyUniqueKey = getSelectedOptionStrategyKey();
-    const quantity = +byId("opt-sell-quantity").value;
+    const buyQuantityB = +byId("opt-offset-buy-quantity").value;
+    const sellQuantityA = +byId("opt-sell-quantity").value;
     const executionCount = +byId("opt-sell-execution-count").value;
 
     status.classList.remove("success");
@@ -1342,19 +2032,29 @@ async function sendOptionOffsetOrder() {
         return;
     }
 
-    if (!selectedStrategy) {
+    if (brokerAdapter.supportsOptionStrategies !== false && !selectedStrategy) {
         status.innerText = "استراتژی را انتخاب کنید.";
         return;
     }
 
-    if (!optionStrategyUniqueKey) {
+    if (brokerAdapter.supportsOptionStrategies !== false && !optionStrategyUniqueKey) {
         status.innerText =
             "کلید استراتژی از کمبوباکس صفحه قابل خواندن نیست؛ مقدار نمایشی برای ارسال سفارش کافی نیست.";
         return;
     }
 
-    if (!Number.isInteger(quantity) || quantity <= 0) {
-        status.innerText = "تعداد آفست را به‌صورت عدد صحیح و بزرگ‌تر از صفر وارد کنید.";
+    if (!Number.isInteger(buyQuantityB) || buyQuantityB < 0) {
+        status.innerText = "تعداد خرید B را به‌صورت عدد صحیح و صفر یا بزرگ‌تر وارد کنید.";
+        return;
+    }
+
+    if (!Number.isInteger(sellQuantityA) || sellQuantityA < 0) {
+        status.innerText = "تعداد فروش A را به‌صورت عدد صحیح و صفر یا بزرگ‌تر وارد کنید.";
+        return;
+    }
+
+    if (buyQuantityB === 0 && sellQuantityA === 0) {
+        status.innerText = "حداقل یکی از تعدادهای خرید B یا فروش A باید بزرگ‌تر از صفر باشد.";
         return;
     }
 
@@ -1372,7 +2072,6 @@ async function sendOptionOffsetOrder() {
         progress.innerText = "در حال اجرا...";
         status.innerText = "";
 
-        const auth = getBrokerAuth();
         let completedCount = 0;
 
         for (let step = 1; step <= executionCount; step++) {
@@ -1411,60 +2110,43 @@ async function sendOptionOffsetOrder() {
                 return;
             }
 
-            progress.innerText =
-                `در حال ثبت خرید B ${step}/${executionCount}...`;
+            let buyResult = null;
 
-            const buyPayload = {
-                PrincipalId: null,
-                InstrumentId: instrumentIdB,
-                ISensOM: "Buy",
-                YValiOmNSC: "Day",
-                PLimSaiOM: askB,
-                QTitTotOM: quantity,
-                QTitDvlOM: 0,
-                extraInfo: JSON.stringify({ ark: crypto.randomUUID() }),
-                optionStrategyUniqueKey,
-                ExecutionType: "Instant"
-            };
+            if (buyQuantityB > 0) {
+                progress.innerText =
+                    `در حال ثبت خرید B ${step}/${executionCount}...`;
 
-            const buyResponse = await fetch(
-                brokerApiUrl(brokerConfig.endpoints.orderEntry),
-                {
-                    method: "POST",
-                    credentials: "include",
-                    headers: {
-                        "content-type": "application/json",
-                        "authorization": auth
-                    },
-                    body: JSON.stringify(buyPayload)
-                }
-            );
+                const orderResult = await brokerAdapter.placeOptionOrder({
+                    instrumentId: instrumentIdB,
+                    side: "Buy",
+                    price: askB,
+                    quantity: buyQuantityB,
+                    strategyKey: optionStrategyUniqueKey
+                });
 
-            const buyResult = await buyResponse.json();
-
-            if (!buyResponse.ok || buyResult?.response?.successful === false) {
-                throw new Error(
-                    getResponseErrorMessage(
-                        buyResult,
-                        "ثبت سفارش خرید نماد B ناموفق بود."
-                    )
-                );
+                buyResult = orderResult.json;
             }
 
             if (optionOffsetExecutionStopRequested) {
                 status.innerText =
-                    "سفارش خرید B ثبت شد؛ ادامه آفست قبل از ارسال فروش A متوقف شد.";
+                    buyQuantityB > 0
+                        ? "سفارش خرید B ثبت شد؛ ادامه آفست قبل از ارسال فروش A متوقف شد."
+                        : "ادامه آفست قبل از ارسال فروش A متوقف شد.";
                 return;
             }
 
-            status.innerText = "در حال بررسی انجام شدن خرید نماد B...";
+            let buyExecuted = true;
 
-            const buyExecuted = await isOptionBuyOrderExecuted({
-                instrumentId: instrumentIdB,
-                price: askB,
-                quantity,
-                orderResponse: buyResult
-            });
+            if (buyQuantityB > 0) {
+                status.innerText = "در حال بررسی انجام شدن خرید نماد B...";
+
+                buyExecuted = await isOptionBuyOrderExecuted({
+                    instrumentId: instrumentIdB,
+                    price: askB,
+                    quantity: buyQuantityB,
+                    orderResponse: buyResult
+                });
+            }
 
             if (!buyExecuted) {
                 status.innerText =
@@ -1474,55 +2156,29 @@ async function sendOptionOffsetOrder() {
 
             if (optionOffsetExecutionStopRequested) {
                 status.innerText =
-                    "سفارش خرید B انجام شد؛ ادامه آفست قبل از ارسال فروش A متوقف شد.";
+                    buyQuantityB > 0
+                        ? "سفارش خرید B انجام شد؛ ادامه آفست قبل از ارسال فروش A متوقف شد."
+                        : "ادامه آفست قبل از ارسال فروش A متوقف شد.";
                 return;
             }
 
             const latestBidA = getBidA();
 
-            if (!latestBidA) {
+            if (sellQuantityA > 0 && !latestBidA) {
                 throw new Error("قیمت سرخط خرید نماد A پیدا نشد.");
             }
 
-            progress.innerText =
-                `در حال ثبت فروش A ${step}/${executionCount}...`;
+            if (sellQuantityA > 0) {
+                progress.innerText =
+                    `در حال ثبت فروش A ${step}/${executionCount}...`;
 
-            const sellPayload = {
-                PrincipalId: null,
-                InstrumentId: instrumentIdA,
-                ISensOM: "Sell",
-                YValiOmNSC: "Day",
-                DValiOM: null,
-                PLimSaiOM: latestBidA,
-                QTitTotOM: quantity,
-                QTitDvlOM: 0,
-                extraInfo: JSON.stringify({ ark: crypto.randomUUID() }),
-                optionStrategyUniqueKey,
-                ExecutionType: "Instant"
-            };
-
-            const sellResponse = await fetch(
-                brokerApiUrl(brokerConfig.endpoints.orderEntry),
-                {
-                    method: "POST",
-                    credentials: "include",
-                    headers: {
-                        "content-type": "application/json",
-                        "authorization": auth
-                    },
-                    body: JSON.stringify(sellPayload)
-                }
-            );
-
-            const sellResult = await sellResponse.json();
-
-            if (!sellResponse.ok || sellResult?.response?.successful === false) {
-                throw new Error(
-                    getResponseErrorMessage(
-                        sellResult,
-                        "ثبت سفارش فروش نماد A ناموفق بود."
-                    )
-                );
+                await brokerAdapter.placeOptionOrder({
+                    instrumentId: instrumentIdA,
+                    side: "Sell",
+                    price: latestBidA,
+                    quantity: sellQuantityA,
+                    strategyKey: optionStrategyUniqueKey
+                });
             }
 
             completedCount++;
@@ -1732,8 +2388,48 @@ function resetOptionPreferences() {
 
     localStorage.removeItem(getOptionPreferenceKey("opt-settings-open"));
     resetOptionAlarmStates();
+    syncOrderQuantityPairs();
     syncOptionAlarmControlsVisibility();
-    updateAutoOptionValues();
+    updateAutoOptionValues().catch(error => {
+        byId("option-symbols-status").innerText = error.message;
+    });
+}
+
+function areOrderQuantitiesSynced() {
+
+    return byId("opt-sync-order-quantities")?.checked;
+}
+
+function syncQuantityInputValue(sourceId, targetId) {
+
+    if (!areOrderQuantitiesSynced())
+        return;
+
+    const source = byId(sourceId);
+    const target = byId(targetId);
+
+    if (!source || !target || target.value === source.value)
+        return;
+
+    target.value = source.value;
+    saveOptionPreference(targetId, "value");
+}
+
+function syncOrderQuantityPairs() {
+
+    syncQuantityInputValue("opt-buy-quantity", "opt-buy-sell-quantity");
+    syncQuantityInputValue("opt-offset-buy-quantity", "opt-sell-quantity");
+}
+
+function bindSyncedQuantityInputs(firstId, secondId) {
+
+    byId(firstId).addEventListener("input", () => {
+        syncQuantityInputValue(firstId, secondId);
+    });
+
+    byId(secondId).addEventListener("input", () => {
+        syncQuantityInputValue(secondId, firstId);
+    });
 }
 
 function checkBuyCondition(
@@ -1825,7 +2521,9 @@ function startOptionMonitoring(showMissingSymbolsMessage = true) {
     optionTimer = null;
     resetOptionAlarmStates();
 
-    refreshOptionSymbols(false);
+    refreshOptionSymbols(false).catch(error => {
+        byId("option-symbols-status").innerText = error.message;
+    });
 
     if (!byId("opt-symbol-a").value || !byId("opt-symbol-b").value) {
         if (showMissingSymbolsMessage) {
@@ -1839,14 +2537,21 @@ function startOptionMonitoring(showMissingSymbolsMessage = true) {
 
     setMonitoringState(true);
 
-    optionTimer = setInterval(() => {
+    optionTimer = setInterval(async () => {
+
+        if (brokerAdapter.refreshOptionMarketData) {
+            await brokerAdapter.refreshOptionMarketData()
+                .catch(error => {
+                    byId("option-symbols-status").innerText = error.message;
+                });
+        }
 
         const ask = getAskA();
         const bid = getBidB();
         const bidA = getBidA();
         const askB = getAskB();
 
-        if (ask && bid) {
+        if (ask !== null && ask !== undefined && bid !== null && bid !== undefined) {
             checkBuyCondition(
                 ask,
                 bid
@@ -1855,7 +2560,7 @@ function startOptionMonitoring(showMissingSymbolsMessage = true) {
             updateOptionAlarmState("buy", false);
         }
 
-        if (bidA && askB) {
+        if (bidA !== null && bidA !== undefined && askB !== null && askB !== undefined) {
             checkSellCondition(
                 bidA,
                 askB
@@ -1880,6 +2585,9 @@ function startOptionMonitoringIfReady() {
 
 loadOptionPreferences();
 bindOptionPreferencePersistence();
+bindSyncedQuantityInputs("opt-buy-quantity", "opt-buy-sell-quantity");
+bindSyncedQuantityInputs("opt-offset-buy-quantity", "opt-sell-quantity");
+syncOrderQuantityPairs();
 syncOptionAlarmControlsVisibility();
 
 byId("opt-start").onclick = () => startOptionMonitoring();
@@ -1897,13 +2605,19 @@ byId("opt-stop")
 byId("opt-symbol-a").onchange = async () => {
 
     await refreshOptionStrategies();
-    updateAutoOptionValues();
+    syncInitialPositionButtonVisibility();
+    updateAutoOptionValues().catch(error => {
+        byId("option-symbols-status").innerText = error.message;
+    });
     startOptionMonitoringIfReady();
 };
 byId("opt-symbol-b").onchange = async () => {
 
     await refreshOptionStrategies();
-    updateAutoOptionValues();
+    syncInitialPositionButtonVisibility();
+    updateAutoOptionValues().catch(error => {
+        byId("option-symbols-status").innerText = error.message;
+    });
     startOptionMonitoringIfReady();
 };
 byId("opt-settings-toggle").onclick = () => {
@@ -1919,6 +2633,8 @@ byId("opt-settings-toggle").onclick = () => {
     );
 };
 byId("opt-auto-values").onchange = updateAutoOptionValues;
+byId("opt-auto-buy-buttons").onchange = syncInitialPositionButtonVisibility;
+byId("opt-sync-order-quantities").onchange = syncOrderQuantityPairs;
 byId("opt-alarm-enabled").onchange = () => {
 
     resetOptionAlarmStates();
@@ -1934,6 +2650,7 @@ byId("opt-stop-execution").onclick = () => {
     byId("opt-stop-execution").disabled = true;
 };
 byId("opt-buy-order").onclick = sendOptionBuyOrder;
+byId("opt-initial-position-order").onclick = sendInitialOptionPositionOrder;
 byId("opt-stop-offset-execution").onclick = () => {
 
     optionOffsetExecutionStopRequested = true;
@@ -1942,48 +2659,34 @@ byId("opt-stop-offset-execution").onclick = () => {
 };
 byId("opt-sell-order").onclick = sendOptionOffsetOrder;
 
+syncInitialPositionButtonVisibility();
+
 function getAskA() {
 
-    const container = getSelectedOptionContainer("opt-symbol-a");
-    const el = container?.querySelector(
-        'client-instrument-price-position-row[orderside="Sell"] .-is-price .-is-clickable'
-    );
-
-    return Number(el?.innerText.replace(/,/g, "").trim());
+    return brokerAdapter.getOptionQuote(
+        byId("opt-symbol-a").value
+    )?.ask;
 }
 
 function getBidB() {
 
-    const container = getSelectedOptionContainer("opt-symbol-b");
-    const el = container?.querySelector(
-        'client-instrument-price-position-row[orderside="Buy"] .-is-price .-is-clickable'
-    );
-
-    return Number(
-        el?.innerText
-            .replace(/,/g, "")
-            .trim()
-    );
+    return brokerAdapter.getOptionQuote(
+        byId("opt-symbol-b").value
+    )?.bid;
 }
 
 function getBidA() {
 
-    const container = getSelectedOptionContainer("opt-symbol-a");
-    const el = container?.querySelector(
-        'client-instrument-price-position-row[orderside="Buy"] .-is-price .-is-clickable'
-    );
-
-    return Number(el?.innerText.replace(/,/g, "").trim());
+    return brokerAdapter.getOptionQuote(
+        byId("opt-symbol-a").value
+    )?.bid;
 }
 
 function getAskB() {
 
-    const container = getSelectedOptionContainer("opt-symbol-b");
-    const el = container?.querySelector(
-        'client-instrument-price-position-row[orderside="Sell"] .-is-price .-is-clickable'
-    );
-
-    return Number(el?.innerText.replace(/,/g, "").trim());
+    return brokerAdapter.getOptionQuote(
+        byId("opt-symbol-b").value
+    )?.ask;
 }
 
 function setMonitoringState(running) {
@@ -2007,10 +2710,30 @@ function setMonitoringState(running) {
     }
 }
 
-refreshOptionSymbols();
-refreshOptionStrategies();
-updateAutoOptionValues();
-setInterval(refreshOptionSymbols, 2000);
-setInterval(refreshOptionStrategies, 2000);
-setInterval(updateAutoOptionValues, 2000);
+refreshOptionSymbols().catch(error => {
+    byId("option-symbols-status").innerText = error.message;
+});
+refreshOptionStrategies().catch(error => {
+    byId("option-symbols-status").innerText = error.message;
+});
+updateAutoOptionValues().catch(error => {
+    byId("option-symbols-status").innerText = error.message;
+});
+syncInitialPositionButtonVisibility();
+setInterval(() => {
+    refreshOptionSymbols().catch(error => {
+        byId("option-symbols-status").innerText = error.message;
+    });
+}, 2000);
+setInterval(() => {
+    refreshOptionStrategies().catch(error => {
+        byId("option-symbols-status").innerText = error.message;
+    });
+}, 2000);
+setInterval(() => {
+    updateAutoOptionValues().catch(error => {
+        byId("option-symbols-status").innerText = error.message;
+    });
+    syncInitialPositionButtonVisibility();
+}, 2000);
 /*---------------------------------------------------------------------*/

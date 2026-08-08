@@ -2,13 +2,17 @@
 
     console.log("Pro Trader loader");
 
+    const assetUrl = path =>
+        chrome.runtime.getURL(path) +
+        "?v=" + encodeURIComponent(chrome.runtime.getManifest().version);
+
     async function loadUI() {
 
         if (document.getElementById("ppt-extension-root")) return;
 
         const [html, css] = await Promise.all([
-            fetch(chrome.runtime.getURL("ui.html")).then(r => r.text()),
-            fetch(chrome.runtime.getURL("ui.css")).then(r => r.text())
+            fetch(assetUrl("ui.html")).then(r => r.text()),
+            fetch(assetUrl("ui.css")).then(r => r.text())
         ]);
 
         const host = document.createElement("div");
@@ -20,12 +24,23 @@
         document.body.appendChild(host);
 
         const configScript = document.createElement("script");
-        configScript.src = chrome.runtime.getURL("config.js");
+        configScript.src = assetUrl("config.js");
 
         configScript.onload = () => {
-            const uiScript = document.createElement("script");
-            uiScript.src = chrome.runtime.getURL("ui.js");
-            document.body.appendChild(uiScript);
+            const adapterScript = document.createElement("script");
+            adapterScript.src = assetUrl("broker-adapters.js");
+
+            const loadMainScript = () => {
+                const uiScript = document.createElement("script");
+                uiScript.src = assetUrl("ui.js");
+                document.body.appendChild(uiScript);
+                adapterScript.remove();
+            };
+
+            adapterScript.onload = loadMainScript;
+            adapterScript.onerror = loadMainScript;
+
+            document.body.appendChild(adapterScript);
             configScript.remove();
         };
 

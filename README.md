@@ -11,8 +11,8 @@ The current version focuses on options trading workflows. Future phases can exte
 ## Current Features
 
 - Injects a small Shadow DOM based trading panel into supported broker pages.
-- Supports Parsian and Khobregan brokerage hosts through profile-based configuration.
-- Reads option symbols directly from the page favorites/watchlist DOM.
+- Supports Parsian, Khobregan, and Ganjineh Sepahr/ephoenix hosts through broker adapters.
+- Reads option symbols from the active broker adapter. Parsian-like brokers use the page favorites/watchlist DOM; ephoenix uses option-chain APIs where possible.
 - Auto-refreshes available option symbols and option strategies.
 - Auto-selects a matching strategy for selected symbols A and B when possible.
 - Monitors option spread conditions for opening and offsetting positions.
@@ -34,8 +34,9 @@ The extension is configured for:
 - `https://patris.parsianbroker.com/*`
 - `https://khobregan.tsetab.ir/*`
 - `https://khobregan-red.tsetab.ir/*`
+- `https://gs.ephoenix.ir/*`
 
-API requests are routed through the active host profile in `config.js`.
+API requests are routed through the active host profile in `config.js` and the matching adapter in `broker-adapters.js`.
 
 ## Installation For Development
 
@@ -52,6 +53,7 @@ If you change files, reload the extension from `chrome://extensions/` and refres
 - `manifest.json`: Chrome extension manifest, permissions, content script registration, and author metadata.
 - `content.js`: Loads the UI, CSS, config, and main script into the broker page.
 - `config.js`: Host-specific broker API configuration.
+- `broker-adapters.js`: Broker-specific API, auth, option-symbol, quote, and order mapping.
 - `ui.html`: Panel markup.
 - `ui.css`: Isolated panel styling.
 - `ui.js`: Trading panel behavior, monitoring, strategy selection, and order flow logic.
