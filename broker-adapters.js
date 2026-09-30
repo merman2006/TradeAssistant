@@ -106,6 +106,20 @@
             : null;
     }
 
+    function getOptionStrikePriceFromDescription(description) {
+        // Example: "اختیارخ خساپا-600-1405/08/27" → 600.
+        // The strike is accepted only when it is immediately followed by a
+        // Jalali expiry date, so an option ticker such as "ضسپا8086" is never
+        // mistaken for a strike price.
+        const match = String(description || "").match(
+            /(?:^|[\s-])([0-9۰-۹٠-٩][0-9۰-۹٠-٩,،]*)\s*-\s*(?:13|14)[0-9۰-۹٠-٩]{2}\s*\/\s*[0-9۰-۹٠-٩]{1,2}\s*\/\s*[0-9۰-۹٠-٩]{1,2}\b/
+        );
+
+        return match
+            ? normalizeNumber(match[1].replace(/،/g, ","))
+            : null;
+    }
+
     function escapeSelectorValue(value) {
         if (window.CSS?.escape)
             return CSS.escape(value);
@@ -434,17 +448,42 @@
                         const symbol =
                             header?.querySelector("label")?.innerText.trim();
                         const description =
-                            header?.querySelector("span")?.innerText.trim();
+                            Array.from(header?.children || [])
+                                .find(element => element.tagName === "SPAN")
+                                ?.innerText.trim();
+                        const strikePrice =
+                            getOptionStrikePriceFromDescription(description);
 
                         return {
                             instrumentId,
                             isin: instrumentId,
-                            title: [symbol, description]
-                                .filter(Boolean)
-                                .join(" - ")
+                            // Keep the combobox label compact; description is
+                            // metadata used only for the automatic strike read.
+                            title: symbol || description,
+                            description,
+                            strikePrice
                         };
                     })
                     .filter(item => item.instrumentId && item.title);
+            },
+
+            getOptionAutoValues(instrumentIdA, instrumentIdB) {
+                const symbols = this.getOptionSymbols();
+                const symbolA = symbols.find(symbol =>
+                    symbol.instrumentId === instrumentIdA
+                );
+                const symbolB = symbols.find(symbol =>
+                    symbol.instrumentId === instrumentIdB
+                );
+
+                return {
+                    maxValue:
+                        Number.isFinite(symbolA?.strikePrice) &&
+                        Number.isFinite(symbolB?.strikePrice)
+                            ? Math.abs(symbolB.strikePrice - symbolA.strikePrice)
+                            : null,
+                    premium: null
+                };
             },
 
             getSelectedOptionContainer(instrumentId) {

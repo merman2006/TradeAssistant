@@ -1,8 +1,9 @@
 #ppt-panel {
     position: fixed;
-    top: 12px;
+    top: auto;
+    bottom: 52px;
     left: 12px;
-    width: 390px;
+    width: min(1500px, calc(100vw - 24px));
     background: #fff;
     box-shadow: 0 10px 28px rgba(0,0,0,.22);
     overflow: hidden;
@@ -180,6 +181,237 @@
 /*-------------------------------معاملات مشتقه----------------------*/
 #ppt-option {
     text-align: right;
+}
+
+.option-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.option-toolbar .primary-btn,
+.option-toolbar > button {
+    width: auto;
+    margin: 0;
+    min-height: 25px;
+    padding: 4px 8px;
+    font-size: 10px;
+}
+
+.option-toolbar #option-symbols-status {
+    flex: 1;
+}
+
+.option-global-settings {
+    margin-bottom: 6px;
+    border: 1px solid #cbd5e1;
+    border-radius: 5px;
+    background: #f8fafc;
+}
+
+.option-settings-heading {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 5px;
+    color: #334155;
+    font-size: 10px;
+}
+
+.option-settings-heading button {
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    background: white;
+    cursor: pointer;
+}
+
+.option-global-settings .option-settings-body {
+    grid-template-columns: repeat(4, max-content);
+    border-top: 1px solid #e5e7eb;
+    padding: 5px;
+}
+
+.option-global-settings .option-settings-body .option-alarm-row {
+    grid-column: span 2;
+}
+
+.option-pairs {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: calc(100vh - 130px);
+    overflow: auto;
+}
+
+.option-pair-card {
+    min-width: 0;
+    padding: 5px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: #f8fafc;
+}
+
+.pair-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+    color: #334155;
+    font-size: 10px;
+}
+
+.pair-header button {
+    border: 1px solid #fecaca;
+    border-radius: 4px;
+    background: #fff1f2;
+    color: #991b1b;
+    padding: 2px 6px;
+    cursor: pointer;
+    font-size: 10px;
+}
+
+.pair-main-row {
+    display: flex;
+    align-items: stretch;
+    gap: 6px;
+    min-width: 1080px;
+    direction: rtl;
+}
+
+.pair-symbols,
+.pair-values,
+.pair-quotes,
+.pair-returns,
+.pair-orders,
+.pair-status,
+.pair-strategy {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    min-width: 104px;
+}
+
+.pair-symbols {
+    flex-direction: row;
+    align-items: center;
+    min-width: 250px;
+}
+
+.pair-symbols label,
+.pair-strategy,
+.pair-values label,
+.pair-orders label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    color: #475569;
+    font-size: 9px;
+    white-space: nowrap;
+}
+
+.pair-symbols label {
+    flex: 1;
+}
+
+.pair-arrow {
+    color: #64748b;
+    font-size: 16px;
+}
+
+.pair-strategy {
+    min-width: 150px;
+}
+
+.pair-symbols select,
+.pair-strategy select,
+.pair-values input,
+.pair-orders input {
+    width: 100%;
+    min-width: 0;
+    height: 24px;
+    padding: 2px 4px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    background: white;
+    font-size: 10px;
+}
+
+.pair-values {
+    min-width: 115px;
+}
+
+.pair-quotes,
+.pair-returns {
+    min-width: 130px;
+    padding: 3px 5px;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    background: white;
+    direction: ltr;
+    text-align: left;
+    font-size: 10px;
+}
+
+.pair-returns {
+    min-width: 145px;
+}
+
+.pair-orders {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(55px, 1fr));
+    align-content: center;
+    min-width: 360px;
+}
+
+.pair-orders button {
+    min-width: 0;
+    height: 24px;
+    padding: 2px 4px;
+    font-size: 9px;
+    white-space: nowrap;
+}
+
+.pair-orders #opt-buy-order,
+.pair-orders #opt-initial-position-order,
+.pair-orders #opt-sell-order {
+    grid-row: 2;
+}
+
+.pair-orders #opt-stop-execution,
+.pair-orders #opt-stop-offset-execution {
+    grid-row: 3;
+}
+
+.pair-status {
+    min-width: 130px;
+    color: #475569;
+    font-size: 10px;
+    text-align: center;
+}
+
+.pair-status span {
+    min-height: 13px;
+}
+
+.pair-main-row button:disabled {
+    cursor: not-allowed;
+    opacity: .55;
+}
+
+@media (max-width: 900px) {
+    #ppt-panel {
+        width: calc(100vw - 24px);
+    }
+
+    .option-global-settings .option-settings-body {
+        grid-template-columns: 1fr 1fr;
+    }
 }
 
 .ppt-card {
@@ -526,3 +758,1281 @@
     font-weight: bold;
 }
 /*---------------------------------------------------------------------*/
+
+/* Multi-pair layout refinements */
+#ppt-panel {
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-width: none;
+}
+
+#ppt-option,
+#opt-pairs,
+.option-pair-card {
+    min-width: 0;
+}
+
+.option-pair-card {
+    overflow: hidden;
+}
+
+.pair-symbol-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    margin-bottom: 6px;
+}
+
+.pair-symbol-row .pair-symbols {
+    flex: 1 1 360px;
+    min-width: 0;
+}
+
+.pair-symbol-row .pair-strategy {
+    flex: 1 1 240px;
+    min-width: 0;
+}
+
+.pair-monitor-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 6px;
+    min-width: 0;
+}
+
+.pair-monitor-section {
+    display: grid;
+    grid-template-columns: minmax(120px, .8fr) minmax(130px, 1fr) minmax(130px, 1fr) minmax(220px, 1.5fr) minmax(115px, .8fr);
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    padding: 5px;
+    border: 1px solid #cbd5e1;
+    border-radius: 5px;
+    background: #fff;
+}
+
+.pair-monitor-section h3 {
+    grid-column: 1 / -1;
+    margin: 0;
+    color: #334155;
+    font-size: 10px;
+    text-align: right;
+}
+
+.pair-monitor-section .pair-values,
+.pair-monitor-section .pair-quotes,
+.pair-monitor-section .pair-returns,
+.pair-monitor-section .pair-orders,
+.pair-monitor-section .pair-status {
+    min-width: 0;
+    width: auto;
+}
+
+.pair-monitor-section .pair-values {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+}
+
+.pair-monitor-section .pair-orders {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+}
+
+.pair-monitor-section .pair-orders button {
+    grid-row: auto;
+    width: 100%;
+}
+
+.pair-monitor-section .pair-status {
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 1000px) {
+    .pair-monitor-row {
+        grid-template-columns: 1fr;
+    }
+
+    .pair-monitor-section {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
+/* Pair symbols and monitor values: compact horizontal controls */
+.pair-symbol-row {
+    flex-wrap: nowrap;
+    margin-bottom: 4px;
+}
+
+.pair-symbol-row .pair-symbols {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+}
+
+.pair-symbol-row .pair-symbols label,
+.pair-symbol-row .pair-strategy {
+    display: grid;
+    grid-template-columns: auto minmax(75px, 1fr);
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+    white-space: nowrap;
+}
+
+.pair-symbol-row .pair-symbols label {
+    flex: 1 1 145px;
+}
+
+.pair-symbol-row .pair-strategy {
+    flex: 1 1 220px;
+}
+
+.pair-symbol-row .pair-symbols select,
+.pair-symbol-row .pair-strategy select {
+    min-width: 0;
+}
+
+.pair-remove {
+    flex: 0 0 16px;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: #fff1f2;
+    color: #991b1b;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 15px;
+    text-align: center;
+}
+
+.pair-monitor-section .pair-quotes,
+.pair-monitor-section .pair-returns {
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    background: #fff;
+    padding: 3px 5px;
+}
+
+@media (max-width: 650px) {
+    .pair-symbol-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .pair-monitor-section {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .pair-monitor-section .pair-values,
+    .pair-monitor-section .pair-quotes,
+    .pair-monitor-section .pair-returns,
+    .pair-monitor-section .pair-orders,
+    .pair-monitor-section .pair-status {
+        grid-column: 1 / -1;
+    }
+}
+
+/* Compact single-line pair monitor layout */
+.option-toolbar {
+    position: relative;
+    padding-left: 260px;
+}
+
+.option-global-settings {
+    position: absolute;
+    top: 8px;
+    right: auto;
+    left: 8px;
+    width: 245px;
+    margin: 0;
+    z-index: 2;
+}
+
+.pair-title {
+    display: none;
+}
+
+.pair-header {
+    min-height: 14px;
+    margin: 0;
+}
+
+.pair-header button {
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    line-height: 15px;
+    text-align: center;
+    font-size: 14px;
+}
+
+.pair-monitor-section {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 4px;
+    padding: 3px;
+    overflow: hidden;
+}
+
+.pair-monitor-section h3 {
+    display: none;
+}
+
+.pair-monitor-section .pair-values,
+.pair-monitor-section .pair-quotes,
+.pair-monitor-section .pair-returns,
+.pair-monitor-section .pair-orders,
+.pair-monitor-section .pair-status {
+    flex: 0 1 auto;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 3px;
+    margin: 0;
+    padding: 2px 3px;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+}
+
+.pair-monitor-section .pair-values label,
+.pair-monitor-section .pair-orders label {
+    flex: 0 1 auto;
+    min-width: 50px;
+}
+
+.pair-monitor-section .pair-values input,
+.pair-monitor-section .pair-orders input {
+    height: 20px;
+    padding: 1px 3px;
+}
+
+.pair-monitor-section .pair-quotes,
+.pair-monitor-section .pair-returns {
+    white-space: nowrap;
+    font-size: 9px;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.pair-monitor-section .pair-orders {
+    flex: 1 1 auto;
+    justify-content: flex-start;
+}
+
+.pair-monitor-section .pair-orders button {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 62px;
+    height: 20px;
+    margin: 0;
+    padding: 1px 4px;
+    font-size: 9px;
+}
+
+.pair-monitor-section .pair-status {
+    flex: 0 1 100px;
+    justify-content: center;
+    font-size: 9px;
+    white-space: nowrap;
+}
+
+@media (max-width: 1000px) {
+    .option-toolbar {
+        padding-left: 0;
+        padding-bottom: 34px;
+    }
+
+    .option-global-settings {
+        top: auto;
+        right: auto;
+        left: 0;
+        bottom: 0;
+        width: 245px;
+    }
+
+    .pair-monitor-row {
+        grid-template-columns: 1fr;
+    }
+
+    .pair-monitor-section {
+        overflow-x: auto;
+    }
+}
+
+/* Final monitor box treatment */
+.ppt-content#ppt-option {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 6px;
+    align-items: start;
+}
+
+.ppt-content#ppt-option > .option-toolbar {
+    grid-column: 1;
+    grid-row: 1;
+    padding: 0;
+}
+
+.ppt-content#ppt-option > .option-global-settings {
+    grid-column: 2;
+    grid-row: 1;
+    position: static;
+    width: auto;
+    min-width: 245px;
+    margin: 0;
+}
+
+.ppt-content#ppt-option > .option-pairs {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+}
+
+.pair-monitor-section .pair-quotes,
+.pair-monitor-section .pair-returns {
+    flex: 0 0 112px;
+    width: 112px;
+    min-height: 39px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    background: #fff;
+    padding: 3px 5px;
+    overflow: hidden;
+}
+
+.pair-monitor-section .pair-returns {
+    flex-basis: 128px;
+    width: 128px;
+}
+
+.pair-monitor-section .pair-quotes span,
+.pair-monitor-section .pair-returns span {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    line-height: 1.45;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pair-monitor-section .pair-returns .return-hit {
+    color: #15803d;
+    font-weight: bold;
+}
+
+@media (max-width: 1000px) {
+    .ppt-content#ppt-option {
+        display: block;
+    }
+
+    .ppt-content#ppt-option > .option-global-settings {
+        position: static;
+        width: 100%;
+        min-width: 0;
+        margin-bottom: 6px;
+    }
+}
+
+/* Minimal sizing changes: preserve the monitor internals and place symbols beside it. */
+.option-pair-card {
+    display: grid;
+    grid-template-columns: 500px minmax(760px, 1fr);
+    align-items: center;
+    gap: 5px;
+    min-width: 1095px;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.option-pair-card .pair-symbol-row {
+    grid-column: 1;
+    grid-row: 1;
+    width: 500px;
+    margin: 0;
+}
+
+.option-pair-card .pair-monitor-row {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 760px;
+    width: 100%;
+    margin: 0;
+}
+
+.pair-symbol-row .pair-symbols {
+    flex: 0 0 290px;
+    width: 290px;
+}
+
+.pair-symbol-row .pair-symbols label {
+    flex: 0 0 130px;
+    width: 130px;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 0;
+}
+
+.pair-symbol-row .pair-strategy {
+    flex: 0 0 200px;
+    width: 200px;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 0;
+}
+
+.pair-monitor-section {
+    grid-template-columns: minmax(105px, .8fr) minmax(90px, .75fr) minmax(115px, .9fr) minmax(205px, 1.4fr) minmax(105px, .75fr);
+}
+
+.pair-monitor-section .pair-values input {
+    width: 60px;
+    min-width: 60px;
+    max-width: 60px;
+}
+
+.pair-monitor-section .pair-quotes {
+    min-width: 90px;
+}
+
+.pair-monitor-section .pair-returns {
+    min-width: 98px;
+    width: 98px;
+    flex-basis: 98px;
+}
+
+/* Preview: place strategy below the A/B symbol selectors. */
+.option-pair-card .pair-symbol-row {
+    flex-wrap: wrap;
+    align-content: center;
+}
+
+.option-pair-card .pair-symbol-row .pair-symbols,
+.option-pair-card .pair-symbol-row .pair-strategy {
+    flex: 0 0 100%;
+    width: 100%;
+}
+
+.option-pair-card .pair-symbol-row {
+    gap: 2px 4px;
+}
+
+.option-pair-card .pair-symbol-row select {
+    height: 19px;
+    padding-top: 1px;
+    padding-bottom: 1px;
+    font-size: 9px;
+}
+
+.option-pair-card .pair-symbol-row .pair-strategy {
+    flex: 0 0 230px;
+    width: 230px;
+}
+
+/* Keep symbols on the right and the open/offset monitor boxes immediately beside them. */
+.option-pair-card {
+    direction: rtl;
+    grid-template-columns: 500px minmax(760px, 1fr);
+}
+
+.option-pair-card .pair-symbol-row {
+    grid-column: 1;
+    grid-row: 1;
+}
+
+.option-pair-card .pair-monitor-row {
+    grid-column: 2;
+    grid-row: 1;
+}
+
+/* Prevent the two financial inputs from colliding. */
+.pair-monitor-section {
+    grid-template-columns: minmax(150px, 1fr) minmax(78px, .6fr) minmax(105px, .8fr) minmax(205px, 1.4fr) minmax(105px, .75fr);
+}
+
+.pair-monitor-section .pair-values {
+    min-width: 150px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.pair-monitor-section .pair-values label {
+    min-width: 0;
+    font-size: 8px;
+}
+
+.pair-monitor-section .pair-quotes {
+    min-width: 78px;
+    width: 78px;
+    flex-basis: 78px;
+    padding-left: 2px;
+    padding-right: 2px;
+    font-size: 8px;
+}
+
+.pair-monitor-section #opt-stop-execution,
+.pair-monitor-section #opt-stop-offset-execution {
+    width: auto;
+    min-width: max-content;
+    flex: 0 0 auto;
+    padding-left: 6px;
+    padding-right: 6px;
+    white-space: nowrap;
+}
+
+/* Keep strategy beside A/B and shrink the symbol group to its content. */
+.option-pair-card {
+    grid-template-columns: max-content minmax(760px, 1fr);
+}
+
+.option-pair-card .pair-symbol-row {
+    flex-wrap: nowrap;
+    width: 365px;
+    justify-self: start;
+}
+
+.option-pair-card .pair-symbol-row .pair-symbols {
+    flex: 0 0 auto;
+    width: max-content;
+}
+
+.option-pair-card .pair-symbol-row .pair-symbols label {
+    flex: 0 0 auto;
+    width: auto;
+    grid-template-columns: max-content 145px;
+}
+
+.option-pair-card .pair-symbol-row .pair-strategy {
+    flex: 0 0 100%;
+    width: 230px;
+    grid-template-columns: max-content 190px;
+}
+
+.option-pair-card .pair-symbol-row {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+}
+
+/* Three-section table view: identity, open position, offset position. */
+.pairs-table-scroll {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    min-width: 0;
+    max-width: 100%;
+    max-height: calc(100vh - 130px);
+    overflow: auto;
+}
+
+.pair-table-header,
+.option-pair-card {
+    display: grid;
+    grid-template-columns: 500px 760px 760px;
+    min-width: 2030px;
+    direction: rtl;
+}
+
+.pair-table-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    align-items: stretch;
+    gap: 5px;
+    padding: 4px 5px;
+    background: #e2e8f0;
+    border-bottom: 1px solid #94a3b8;
+}
+
+.pair-table-header-box {
+    display: grid;
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+    padding: 4px;
+    border: 1px solid #94a3b8;
+    border-radius: 5px;
+    background: #f8fafc;
+    color: #334155;
+    font-size: 9px;
+    font-weight: bold;
+    text-align: center;
+}
+
+.pair-identity-header {
+    grid-column: 1;
+    grid-template-columns: 20px 145px 145px 190px;
+}
+
+.pair-open-header {
+    grid-column: 2;
+    grid-template-columns: repeat(11, minmax(55px, 1fr));
+}
+
+.pair-offset-header {
+    grid-column: 3;
+    grid-template-columns: repeat(11, minmax(55px, 1fr));
+}
+
+.pair-table-header-box span {
+    min-width: 0;
+    overflow: hidden;
+    line-height: 1.25;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.option-pair-card {
+    align-items: center;
+    gap: 5px;
+    min-width: 2030px;
+    margin-bottom: 5px;
+    overflow: visible;
+}
+
+.option-pair-card .pair-symbol-row {
+    grid-column: 1;
+    grid-row: 1;
+    width: 500px;
+    margin: 0;
+}
+
+.option-pair-card .pair-monitor-row {
+    display: contents;
+}
+
+.option-pair-card .pair-open-section {
+    grid-column: 2;
+    grid-row: 1;
+    width: 760px;
+}
+
+.option-pair-card .pair-offset-section {
+    grid-column: 3;
+    grid-row: 1;
+    width: 760px;
+}
+
+.option-pairs {
+    display: block;
+    max-height: none;
+    overflow: visible;
+}
+
+/* Keep the identity controls directly under their corresponding header cells. */
+.option-pair-card .pair-symbol-row {
+    display: grid;
+    grid-template-columns: 20px 145px 145px 190px;
+    width: 500px;
+    min-width: 500px;
+    gap: 3px;
+    direction: rtl;
+    align-items: center;
+}
+
+.option-pair-card .pair-symbol-row .pair-symbols {
+    display: contents;
+}
+
+.option-pair-card .pair-symbol-row .pair-remove {
+    grid-column: 1;
+    grid-row: 1;
+}
+
+.option-pair-card .pair-symbol-row .pair-symbols label:nth-of-type(1) {
+    grid-column: 2;
+    grid-row: 1;
+}
+
+.option-pair-card .pair-symbol-row .pair-symbols label:nth-of-type(2) {
+    grid-column: 3;
+    grid-row: 1;
+}
+
+.option-pair-card .pair-symbol-row .pair-strategy {
+    grid-column: 4;
+    grid-row: 1;
+    width: 190px;
+    min-width: 190px;
+}
+
+/* Compact symbol columns while keeping the row aligned with the header. */
+.pair-identity-header {
+    grid-template-columns: 20px 100px 100px 190px;
+    width: max-content;
+    min-width: 0;
+}
+
+.option-pair-card .pair-symbol-row {
+    grid-template-columns: 20px 100px 100px 190px;
+    width: max-content;
+    min-width: 0;
+}
+
+.option-pair-card .pair-symbol-row .pair-symbols label {
+    display: block;
+    width: 100px;
+    min-width: 100px;
+    max-width: 100px;
+}
+
+.option-pair-card .pair-symbol-row .pair-symbols select {
+    width: 100px;
+}
+
+.option-pair-card .pair-symbol-row .pair-strategy {
+    display: block;
+    width: 190px;
+    min-width: 190px;
+    max-width: 190px;
+}
+
+.option-pair-card .pair-symbol-row .pair-strategy select {
+    display: block;
+    width: 190px;
+}
+
+/* Place the opening-position section immediately beside the symbol section. */
+.pair-table-header,
+.option-pair-card {
+    column-gap: 5px;
+    grid-template-columns: 420px 760px 760px;
+    min-width: 1945px;
+}
+
+/* Table cells for quotes and returns: values sit directly under the header labels. */
+.pair-open-header {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+.pair-open-section,
+.pair-offset-section {
+    position: relative;
+    display: grid;
+    align-items: center;
+    gap: 3px;
+    padding: 3px;
+    overflow: visible;
+}
+
+.pair-open-section {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+.pair-offset-section {
+    grid-template-columns: repeat(11, minmax(0, 1fr));
+}
+
+.pair-open-section .pair-values,
+.pair-open-section .pair-quotes,
+.pair-open-section .pair-returns,
+.pair-open-section .pair-orders,
+.pair-offset-section .pair-values,
+.pair-offset-section .pair-quotes,
+.pair-offset-section .pair-returns,
+.pair-offset-section .pair-orders {
+    display: contents;
+}
+
+.pair-monitor-section .pair-values label,
+.pair-monitor-section .pair-quotes span,
+.pair-monitor-section .pair-returns span,
+.pair-monitor-section .pair-orders label,
+.pair-monitor-section .pair-orders button {
+    min-width: 0;
+    width: 100%;
+    margin: 0;
+    padding-left: 2px;
+    padding-right: 2px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.pair-monitor-section .pair-values input,
+.pair-monitor-section .pair-orders input {
+    width: 100%;
+    min-width: 0;
+}
+
+.pair-monitor-section .pair-quotes span,
+.pair-monitor-section .pair-returns span {
+    min-height: 20px;
+    padding-top: 3px;
+    padding-bottom: 3px;
+    border: 0;
+    background: transparent;
+    text-align: center;
+}
+
+.pair-monitor-section .pair-status {
+    position: absolute;
+    right: 3px;
+    bottom: -16px;
+    z-index: 2;
+    width: max-content;
+    max-width: 100%;
+    padding: 0;
+    font-size: 8px;
+}
+
+/* Explicit column mapping keeps every control below its header cell. */
+.pair-open-section .pair-values label:nth-child(1),
+.pair-offset-section .pair-values label:nth-child(1) { grid-column: 1; }
+.pair-open-section .pair-values label:nth-child(2),
+.pair-offset-section .pair-values label:nth-child(2) { grid-column: 2; }
+
+.pair-open-section .pair-quotes span:nth-child(1),
+.pair-offset-section .pair-quotes span:nth-child(1) { grid-column: 3; }
+.pair-open-section .pair-quotes span:nth-child(2),
+.pair-offset-section .pair-quotes span:nth-child(2) { grid-column: 4; }
+
+.pair-open-section .pair-returns span:nth-child(1),
+.pair-offset-section .pair-returns span:nth-child(1) { grid-column: 5; }
+.pair-open-section .pair-returns span:nth-child(2),
+.pair-offset-section .pair-returns span:nth-child(2) { grid-column: 6; }
+
+.pair-open-section .pair-orders label:nth-child(1),
+.pair-offset-section .pair-orders label:nth-child(1) { grid-column: 7; }
+.pair-open-section .pair-orders label:nth-child(2),
+.pair-offset-section .pair-orders label:nth-child(2) { grid-column: 8; }
+.pair-open-section .pair-orders label:nth-child(3),
+.pair-offset-section .pair-orders label:nth-child(3) { grid-column: 9; }
+
+.pair-open-section .pair-orders button:nth-of-type(1) { grid-column: 10; }
+.pair-open-section .pair-orders button:nth-of-type(2) { grid-column: 11; }
+.pair-open-section .pair-orders button:nth-of-type(3) { grid-column: 12; }
+.pair-offset-section .pair-orders button:nth-of-type(1) { grid-column: 10; }
+.pair-offset-section .pair-orders button:nth-of-type(2) { grid-column: 11; }
+
+.pair-open-section .pair-values > label,
+.pair-open-section .pair-quotes > span,
+.pair-open-section .pair-returns > span,
+.pair-open-section .pair-orders > label,
+.pair-open-section .pair-orders > button,
+.pair-offset-section .pair-values > label,
+.pair-offset-section .pair-quotes > span,
+.pair-offset-section .pair-returns > span,
+.pair-offset-section .pair-orders > label,
+.pair-offset-section .pair-orders > button {
+    grid-row: 1;
+}
+
+/* Compact, shared table geometry: header and every pair row use the same columns. */
+.pair-table-header,
+.option-pair-card {
+    grid-template-columns: 350px 720px 720px;
+    min-width: 1800px;
+}
+
+.pair-identity-header,
+.option-pair-card .pair-symbol-row {
+    grid-template-columns: 20px 80px 80px 150px;
+    width: 350px;
+    min-width: 350px;
+}
+
+.pair-identity-header {
+    width: 350px;
+}
+
+.option-pair-card .pair-symbol-row .pair-symbols label,
+.option-pair-card .pair-symbol-row .pair-symbols select {
+    width: 80px;
+    min-width: 80px;
+    max-width: 80px;
+}
+
+.option-pair-card .pair-symbol-row .pair-strategy,
+.option-pair-card .pair-symbol-row .pair-strategy select {
+    width: 150px;
+    min-width: 150px;
+    max-width: 150px;
+}
+
+.pair-open-header {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+.pair-offset-header {
+    grid-template-columns: repeat(11, minmax(0, 1fr));
+}
+
+.pair-open-section,
+.pair-offset-section {
+    width: 720px;
+}
+
+.pair-monitor-section .pair-quotes span,
+.pair-monitor-section .pair-returns span {
+    font-size: 8px;
+}
+
+.pair-monitor-section .pair-orders label:first-child input {
+    width: 38px;
+}
+
+/* Make header cells and detail cells exactly the same size. */
+.pair-table-header .pair-identity-header,
+.pair-table-header .pair-open-header,
+.pair-table-header .pair-offset-header {
+    box-sizing: border-box;
+    min-width: 0;
+}
+
+.pair-table-header .pair-identity-header {
+    width: 350px;
+}
+
+.pair-table-header .pair-open-header,
+.pair-table-header .pair-offset-header,
+.option-pair-card .pair-open-section,
+.option-pair-card .pair-offset-section {
+    width: 720px;
+    min-width: 720px;
+    box-sizing: border-box;
+}
+
+.pair-table-header-box {
+    padding-left: 3px;
+    padding-right: 3px;
+}
+
+/* Give the symbol/strategy controls the same bordered treatment as monitor sections. */
+.option-pair-card .pair-symbol-row {
+    box-sizing: border-box;
+    height: 32px;
+    min-height: 32px;
+    padding: 3px;
+    border: 1px solid #cbd5e1;
+    border-radius: 5px;
+    background: #fff;
+}
+
+.pair-monitor-section #opt-stop-execution,
+.pair-monitor-section #opt-stop-offset-execution {
+    width: max-content;
+    min-width: max-content;
+    max-width: max-content;
+    padding-left: 5px;
+    padding-right: 5px;
+    white-space: nowrap;
+}
+
+.pair-monitor-section #opt-initial-position-order {
+    width: max-content;
+    min-width: max-content;
+    max-width: max-content;
+}
+
+/* Final table contract: header cells and row cells share identical geometry. */
+.pair-table-header,
+.option-pair-card {
+    grid-template-columns: 350px 720px 720px !important;
+    column-gap: 5px !important;
+}
+
+.pair-table-header-box,
+.pair-monitor-section {
+    box-sizing: border-box;
+    gap: 3px;
+    padding: 3px;
+}
+
+.pair-table-header .pair-identity-header,
+.option-pair-card .pair-symbol-row {
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box;
+    grid-template-columns: 20px 80px 80px 150px;
+}
+
+.pair-table-header .pair-open-header,
+.pair-table-header .pair-offset-header,
+.option-pair-card .pair-open-section,
+.option-pair-card .pair-offset-section {
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box;
+}
+
+.pair-table-header .pair-open-header,
+.option-pair-card .pair-open-section {
+    grid-template-columns: repeat(6, minmax(0, 1fr)) 45px 55px 55px 65px 45px max-content;
+}
+
+.pair-table-header .pair-offset-header,
+.option-pair-card .pair-offset-section {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) 45px 45px 45px max-content 45px 55px 55px 65px max-content;
+}
+
+.pair-table-header-box span,
+.pair-monitor-section > * {
+    box-sizing: border-box;
+}
+
+/* Compact table width: shrinking a track also shrinks the outer table. */
+.pair-table-header,
+.option-pair-card {
+    grid-template-columns: 350px 640px 600px !important;
+    min-width: 1595px !important;
+}
+
+.pair-table-header .pair-open-header,
+.option-pair-card .pair-open-section {
+    width: 640px !important;
+    min-width: 640px !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 55px 55px 55px 65px 40px 55px 55px 60px 45px max-content;
+}
+
+.pair-table-header .pair-offset-header,
+.option-pair-card .pair-offset-section {
+    width: 600px !important;
+    min-width: 600px !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 55px 55px 55px max-content 40px 55px 55px 55px max-content;
+}
+
+.pair-monitor-section .pair-values input {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.pair-monitor-section .pair-values label,
+.pair-monitor-section .pair-quotes span,
+.pair-monitor-section .pair-returns span,
+.pair-monitor-section .pair-orders label,
+.pair-monitor-section .pair-orders button {
+    min-width: 0 !important;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.pair-monitor-section .pair-orders input {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+}
+
+/* Match header/detail tracks and reserve only the space actually needed by count/stop. */
+.pair-open-header,
+.pair-open-section {
+    grid-template-columns: repeat(6, minmax(0, 1fr)) 45px 55px 55px 65px 45px max-content;
+}
+
+.pair-offset-header,
+.pair-offset-section {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) 45px 45px 45px minmax(0, 1fr) 45px 55px 55px 65px max-content;
+}
+
+.pair-monitor-section .pair-values label,
+.pair-monitor-section .pair-orders label {
+    font-size: 10px;
+}
+
+.pair-monitor-section input[type="number"] {
+    direction: ltr;
+    text-align: left;
+}
+
+.pair-monitor-section .pair-quotes span,
+.pair-monitor-section .pair-returns span {
+    font-size: 10px;
+}
+
+/* Keep each monitor box as one compact horizontal row. */
+.pair-open-section,
+.pair-offset-section {
+    grid-template-rows: 24px !important;
+    grid-auto-rows: 24px;
+    height: 32px;
+    min-height: 32px;
+    box-sizing: border-box;
+}
+
+.pair-open-section .pair-values > label,
+.pair-open-section .pair-quotes > span,
+.pair-open-section .pair-returns > span,
+.pair-open-section .pair-orders > label,
+.pair-open-section .pair-open-section > button,
+.pair-open-section .pair-orders > button,
+.pair-offset-section .pair-values > label,
+.pair-offset-section .pair-quotes > span,
+.pair-offset-section .pair-returns > span,
+.pair-offset-section .pair-orders > label,
+.pair-offset-section .pair-orders > button {
+    grid-row: 1 !important;
+}
+
+/* Absolute final table geometry: both pair rows use the same fixed tracks. */
+.pair-table-header,
+.option-pair-card {
+    grid-template-columns: 350px 640px 600px !important;
+    min-width: 1595px !important;
+    column-gap: 5px !important;
+}
+
+.pair-table-header .pair-identity-header,
+.option-pair-card .pair-symbol-row {
+    width: 350px !important;
+    min-width: 350px !important;
+    box-sizing: border-box;
+    grid-template-columns: 20px 80px 80px 150px !important;
+}
+
+.pair-table-header .pair-open-header,
+.option-pair-card .pair-open-section {
+    width: 640px !important;
+    min-width: 640px !important;
+    box-sizing: border-box;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 55px 55px 55px 65px 40px 55px 55px 60px 45px max-content !important;
+}
+
+.pair-table-header .pair-offset-header,
+.option-pair-card .pair-offset-section {
+    width: 600px !important;
+    min-width: 600px !important;
+    box-sizing: border-box;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 55px 55px 55px max-content 40px 55px 55px 55px max-content !important;
+}
+
+.option-pair-card .pair-open-section input[type="number"],
+.option-pair-card .pair-offset-section input[type="number"] {
+    box-sizing: border-box;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+}
+
+.option-pair-card .pair-open-section .pair-values > label,
+.option-pair-card .pair-open-section .pair-orders > label,
+.option-pair-card .pair-offset-section .pair-values > label,
+.option-pair-card .pair-offset-section .pair-orders > label {
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+.option-pair-card .pair-open-section .pair-orders > button,
+.option-pair-card .pair-offset-section .pair-orders > button {
+    box-sizing: border-box;
+    min-width: 0 !important;
+    max-width: 100% !important;
+}
+
+.option-pair-card .pair-open-section #opt-stop-execution,
+.option-pair-card .pair-offset-section #opt-stop-offset-execution {
+    width: max-content !important;
+    min-width: max-content !important;
+    max-width: max-content !important;
+}
+
+.option-pair-card .pair-open-section .pair-quotes span,
+.option-pair-card .pair-open-section .pair-returns span,
+.option-pair-card .pair-offset-section .pair-quotes span,
+.option-pair-card .pair-offset-section .pair-returns span {
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    font-size: 10px !important;
+    overflow: hidden;
+}
+
+.pair-monitor-section .quote-fallback {
+    color: #f97316 !important;
+}
+
+/* Fit the panel to the compact table instead of stretching it across the viewport. */
+#ppt-panel {
+    left: 12px;
+    right: auto;
+    width: min(1595px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+}
+
+.option-pair-card .pair-open-section input[type="number"],
+.option-pair-card .pair-offset-section input[type="number"] {
+    display: block;
+    height: 20px;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    flex: 0 0 auto;
+}
+
+#ppt-panel {
+    width: min(1630px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+}
+
+#ppt-option.minimized,
+#ppt-stock.minimized {
+    display: none !important;
+}
+
+#ppt-panel.minimized {
+    width: max-content;
+    min-width: 130px;
+    max-width: calc(100vw - 24px);
+}
+
+/*
+ * Header cells and pair cells must not derive a column width from their
+ * individual contents.  A header label and its corresponding action button
+ * have different intrinsic widths, so using max-content made their grids
+ * drift apart.  Keep one explicit, shared track list for each section.
+ */
+.pair-table-header .pair-open-header,
+.option-pair-card .pair-open-section {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 55px 55px 55px 65px 40px 55px 55px 60px 45px 45px !important;
+}
+
+.pair-table-header .pair-offset-header,
+.option-pair-card .pair-offset-section {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 55px 55px 55px 65px 40px 55px 55px 55px 45px !important;
+}
+
+.option-pair-card .pair-open-section #opt-initial-position-order,
+.option-pair-card .pair-open-section #opt-stop-execution,
+.option-pair-card .pair-offset-section #opt-stop-offset-execution {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+}
+
+/*
+ * Execution messages used to sit below the card without reserved space.  Their
+ * changing width/height extended the scrollable table and made it jump while
+ * an order was in progress.  Every row now has a fixed status lane, and the
+ * message is clipped to the width of its own open/offset section.
+ */
+.option-pair-card {
+    padding-bottom: 16px;
+}
+
+.pair-monitor-section .pair-status {
+    right: 3px;
+    bottom: -15px;
+    width: calc(100% - 6px);
+    max-width: calc(100% - 6px);
+    height: 14px;
+    min-height: 14px;
+    overflow: hidden;
+    pointer-events: none;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.pair-monitor-section .pair-status span {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

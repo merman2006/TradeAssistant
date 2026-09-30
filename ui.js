@@ -349,7 +349,9 @@ const root = document
     .getElementById("ppt-extension-root")
     .shadowRoot;
 
-const byId = id => root.getElementById(id);
+let activePairRoot = null;
+const byId = id =>
+    activePairRoot?.querySelector(`#${id}`) || root.getElementById(id);
 const DERIVATIVE_MAIN_HOSTS = [
     "khobregan.tsetab.ir",
     "khobregan-red.tsetab.ir",
@@ -476,7 +478,10 @@ root.querySelectorAll(".ppt-tab").forEach(tab => {
 // ---------- Minimize ----------
 
 byId("ppt-minimize")
-    .onclick = () => {
+    .onclick = event => {
+
+        event.preventDefault();
+        event.stopPropagation();
 
         const current =
             root.querySelector(".ppt-content.active");
@@ -484,6 +489,10 @@ byId("ppt-minimize")
         if (!current) return;
 
         current.classList.toggle("minimized");
+        byId("ppt-panel").classList.toggle(
+            "minimized",
+            current.classList.contains("minimized")
+        );
         derivativePanelManualOverride =
             current.id === "ppt-option" &&
             !current.classList.contains("minimized");
@@ -517,8 +526,26 @@ syncDerivativeTabVisibility();
     let startX = 0;
     let startY = 0;
 
-    let startLeft = 0;
-    let startTop = 0;
+    let startOffsetX = 0;
+    let startOffsetY = 0;
+
+    const positionStorageKey = "ppt-panel-position:v1";
+    let offsetX = 0;
+    let offsetY = 0;
+
+    try {
+        const savedPosition = JSON.parse(
+            localStorage.getItem(positionStorageKey) || "null"
+        );
+
+        if (Number.isFinite(savedPosition?.x))
+            offsetX = savedPosition.x;
+
+        if (Number.isFinite(savedPosition?.y))
+            offsetY = savedPosition.y;
+    } catch (_) {}
+
+    panel.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
 
     header.addEventListener("mousedown", e => {
 
@@ -527,24 +554,29 @@ syncDerivativeTabVisibility();
         startX = e.clientX;
         startY = e.clientY;
 
-        startLeft = panel.offsetLeft;
-        startTop = panel.offsetTop;
+        startOffsetX = offsetX;
+        startOffsetY = offsetY;
     });
 
     document.addEventListener("mousemove", e => {
 
         if (!dragging) return;
 
-        panel.style.left =
-            startLeft + (e.clientX - startX) + "px";
+        offsetX = startOffsetX + (e.clientX - startX);
+        offsetY = startOffsetY + (e.clientY - startY);
 
-        panel.style.top =
-            startTop + (e.clientY - startY) + "px";
+        panel.style.transform =
+            `translate(${offsetX}px, ${offsetY}px)`;
     });
 
     document.addEventListener("mouseup", () => {
 
         dragging = false;
+
+        localStorage.setItem(
+            positionStorageKey,
+            JSON.stringify({ x: offsetX, y: offsetY })
+        );
     });
 
 })();
@@ -561,7 +593,7 @@ let optionOffsetExecutionStopRequested = false;
 let optionPositionsTabClickRequested = false;
 const ALARM_BEEP_COUNT = 5;
 const ALARM_BEEP_INTERVAL_MS = 500;
-const optionAlarmStates = {
+let optionAlarmStates = {
     buy: { isHit: false, signature: null },
     offset: { isHit: false, signature: null }
 };
@@ -570,6 +602,7 @@ const OPTION_PERSISTED_FIELDS = [
     { id: "opt-auto-values", type: "checkbox" },
     { id: "opt-auto-buy-buttons", type: "checkbox" },
     { id: "opt-sync-order-quantities", type: "checkbox" },
+    { id: "opt-verify-buy-position", type: "checkbox" },
     { id: "opt-alarm-enabled", type: "checkbox" },
     { id: "opt-alarm-count", type: "value" },
     { id: "opt-alarm-interval", type: "value" },
@@ -585,6 +618,11 @@ const OPTION_PERSISTED_FIELDS = [
 
 const OPTION_INSTRUMENT_ID_PREFIX = "option-instrument-focus-target-";
 const OPTION_POSITIONS_TAB_LABEL = "موقعیت های اختیار";
+const OPTION_BUY_POSITION_LABEL = "موقعیت خرید";
+const OPTION_SELL_POSITION_LABEL = "موقعیت فروش";
+const OPTION_POSITION_READ_TIMEOUT_MS = 5000;
+const OPTION_BUY_VERIFICATION_TIMEOUT_MS = 20000;
+const OPTION_BUY_VERIFICATION_POLL_MS = 500;
 const OPTION_STRATEGY_SELECTORS = [
     'ng-select[formcontrolname="buyOptionStrategyUniqueKey"]',
     ".-is-strategyDropdown"
@@ -754,7 +792,7 @@ function getOptionPositionRow(instrumentId) {
         return null;
 
     return document.querySelector(
-        `.ag-center-cols-container [role="row"][row-id="${escapeSelectorValue(instrumentId)}"]`
+        `.ag-center-cols-container [row-id="${escapeSelectorValue(instrumentId)}"]`
     );
 }
 
@@ -813,6 +851,122 @@ function getOptionPositionValue(instrumentId, columnId) {
     return parseOptionNumber(cell?.innerText);
 }
 
+function getOptionPositionColumnId(label) {
+
+    const normalizedLabel = normalizeDomText(label)
+        .replace(/[\u200c\u200f]/g, "")
+        .replace(/ي/g, "ی")
+        .replace(/ك/g, "ک");
+    const header = Array
+        .from(document.querySelectorAll(
+            ".ag-header [col-id], .ag-header-cell[col-id], [role=columnheader][col-id]"
+        ))
+        .find(cell => normalizeDomText(cell.innerText)
+            .replace(/[\u200c\u200f]/g, "")
+            .replace(/ي/g, "ی")
+            .replace(/ك/g, "ک")
+            .includes(normalizedLabel));
+
+    return header?.getAttribute("col-id") || null;
+}
+
+function readOptionPositionQuantity(instrumentId, label) {
+
+    const columnId = getOptionPositionColumnId(label);
+
+    if (!columnId)
+        return null;
+
+    const row = getOptionPositionRow(instrumentId);
+
+    // Once the grid and its column are present, a missing instrument row
+    // represents zero position for that instrument.
+    if (!row)
+        return 0;
+
+    const cell = row.querySelector(`[col-id="${escapeSelectorValue(columnId)}"]`);
+
+    if (!cell)
+        return null;
+
+    const quantity = parseOptionNumber(cell.innerText);
+
+    if (quantity !== null)
+        return quantity;
+
+    // The broker renders an empty position as a dash in some grid rows.
+    return /^[-–—]?$/.test(normalizeDomText(cell.innerText))
+        ? 0
+        : null;
+}
+
+async function waitForOptionPositionQuantity(instrumentId, label) {
+
+    ensureOptionPositionsTabLoaded();
+
+    const deadline = Date.now() + OPTION_POSITION_READ_TIMEOUT_MS;
+
+    while (Date.now() <= deadline) {
+        const quantity = readOptionPositionQuantity(instrumentId, label);
+
+        if (quantity !== null)
+            return quantity;
+
+        await delay(OPTION_BUY_VERIFICATION_POLL_MS);
+    }
+
+    return null;
+}
+
+function isOptionBuyPositionVerificationEnabled() {
+
+    return !!byId("opt-verify-buy-position")?.checked;
+}
+
+async function verifyOptionBuyFromPositions({
+    instrumentId,
+    quantity,
+    positionBefore,
+    positionLabel = OPTION_BUY_POSITION_LABEL,
+    expectedDirection = "increase",
+    isStopRequested,
+    progress
+}) {
+
+    const deadline = Date.now() + OPTION_BUY_VERIFICATION_TIMEOUT_MS;
+    let filledQuantity = 0;
+
+    while (Date.now() <= deadline) {
+        if (isStopRequested()) {
+            return { executed: false, stopped: true, filledQuantity };
+        }
+
+        const currentPosition = readOptionPositionQuantity(
+            instrumentId,
+            positionLabel
+        );
+
+        if (currentPosition !== null) {
+            filledQuantity = Math.max(
+                0,
+                expectedDirection === "decrease"
+                    ? positionBefore - currentPosition
+                    : currentPosition - positionBefore
+            );
+
+            if (filledQuantity >= quantity)
+                return { executed: true, filledQuantity };
+
+            progress.innerText =
+                `در حال بررسی ${positionLabel} (${filledQuantity} از ${quantity})...`;
+        }
+
+        await delay(OPTION_BUY_VERIFICATION_POLL_MS);
+    }
+
+    return { executed: false, stopped: false, filledQuantity };
+}
+
 async function updateAutoOptionValues() {
 
     if (!byId("opt-auto-values")?.checked)
@@ -842,7 +996,14 @@ async function updateAutoOptionValues() {
             );
         }
 
-        return;
+        if (
+            values?.premium !== null &&
+            values?.premium !== undefined &&
+            values?.maxValue !== null &&
+            values?.maxValue !== undefined
+        ) {
+            return;
+        }
     }
 
     const positionRowA = getOptionPositionRow(instrumentIdA);
@@ -1608,8 +1769,28 @@ async function sendOptionBuyOrder() {
             }
 
             let result = null;
+            let buyPositionBefore = null;
 
             if (buyQuantityA > 0) {
+                if (isOptionBuyPositionVerificationEnabled()) {
+                    progress.innerText = "در حال دریافت موقعیت خرید A...";
+                    buyPositionBefore = await waitForOptionPositionQuantity(
+                        instrumentIdA,
+                        OPTION_BUY_POSITION_LABEL
+                    );
+
+                    if (buyPositionBefore === null) {
+                        status.innerText =
+                            "موقعیت خرید A از تب موقعیت‌های اختیار قابل خواندن نیست؛ برای جلوگیری از فروش بدون خرید، سفارش ارسال نشد.";
+                        return;
+                    }
+
+                    if (optionExecutionStopRequested) {
+                        status.innerText = "اجرای سفارش پیش از ثبت خرید متوقف شد.";
+                        return;
+                    }
+                }
+
                 progress.innerText =
                     `در حال ثبت خرید ${step}/${executionCount}...`;
 
@@ -1633,21 +1814,54 @@ async function sendOptionBuyOrder() {
             }
 
             let buyExecuted = true;
+            let sellQuantityForStep = sellQuantityB;
+            let partialBuyFilledQuantity = 0;
 
             if (buyQuantityA > 0) {
                 status.innerText = "در حال بررسی انجام شدن خرید نماد A...";
 
-                buyExecuted = await isOptionBuyOrderExecuted({
-                    instrumentId: instrumentIdA,
-                    price: askA,
-                    quantity: buyQuantityA,
-                    orderResponse: result
-                });
+                if (isOptionBuyPositionVerificationEnabled()) {
+                    const verification = await verifyOptionBuyFromPositions({
+                        instrumentId: instrumentIdA,
+                        quantity: buyQuantityA,
+                        positionBefore: buyPositionBefore,
+                        isStopRequested: () => optionExecutionStopRequested,
+                        progress
+                    });
+
+                    buyExecuted = verification.executed;
+
+                    if (!buyExecuted) {
+                        if (!verification.stopped && verification.filledQuantity > 0) {
+                            partialBuyFilledQuantity = verification.filledQuantity;
+                            sellQuantityForStep = Math.min(
+                                sellQuantityB,
+                                partialBuyFilledQuantity
+                            );
+                            buyExecuted = true;
+                            status.innerText =
+                                `خرید A فقط ${partialBuyFilledQuantity} از ${buyQuantityA} انجام شد؛ فروش B به تعداد ${sellQuantityForStep} ارسال می‌شود.`;
+                        } else {
+                            status.innerText = verification.stopped
+                                ? "سفارش خرید A ثبت شد؛ ادامه اجرا هنگام بررسی موقعیت متوقف شد و فروش B ارسال نشد."
+                                : "افزایش موقعیت خرید A تأیید نشد؛ فروش B ارسال نشد.";
+                        }
+                    }
+                } else {
+                    buyExecuted = await isOptionBuyOrderExecuted({
+                        instrumentId: instrumentIdA,
+                        price: askA,
+                        quantity: buyQuantityA,
+                        orderResponse: result
+                    });
+                }
             }
 
             if (!buyExecuted) {
-                status.innerText =
-                    "سفارش خرید A ثبت شد؛ بررسی انجام معامله هنوز پیاده‌سازی نشده و فروش B ارسال نشد.";
+                if (!status.innerText) {
+                    status.innerText =
+                        "سفارش خرید A ثبت شد؛ فروش B ارسال نشد.";
+                }
                 return;
             }
 
@@ -1661,11 +1875,11 @@ async function sendOptionBuyOrder() {
 
             const latestBidB = getBidB();
 
-            if (sellQuantityB > 0 && !latestBidB) {
+            if (sellQuantityForStep > 0 && !latestBidB) {
                 throw new Error("قیمت سرخط خرید نماد B پیدا نشد.");
             }
 
-            if (sellQuantityB > 0) {
+            if (sellQuantityForStep > 0) {
                 progress.innerText =
                     `در حال ثبت فروش ${step}/${executionCount}...`;
 
@@ -1673,7 +1887,7 @@ async function sendOptionBuyOrder() {
                     instrumentId: instrumentIdB,
                     side: "Sell",
                     price: latestBidB,
-                    quantity: sellQuantityB,
+                    quantity: sellQuantityForStep,
                     strategyKey: optionStrategyUniqueKey
                 });
             }
@@ -1681,6 +1895,12 @@ async function sendOptionBuyOrder() {
             completedCount++;
             status.innerText =
                 `${completedCount} از ${executionCount} اجرا انجام شد.`;
+
+            if (partialBuyFilledQuantity > 0) {
+                status.innerText =
+                    `خرید A به‌صورت جزئی (${partialBuyFilledQuantity}) انجام شد و فروش B به تعداد ${sellQuantityForStep} ارسال شد؛ ادامه اجرا متوقف شد. مانده سفارش خرید A را بررسی کنید.`;
+                return;
+            }
 
             if (optionExecutionStopRequested) {
                 status.innerText =
@@ -1889,8 +2109,28 @@ async function sendInitialOptionPositionOrder() {
             }
 
             let buyResult = null;
+            let buyPositionBefore = null;
 
             if (buyQuantityA > 0) {
+                if (isOptionBuyPositionVerificationEnabled()) {
+                    progress.innerText = "در حال دریافت موقعیت خرید A...";
+                    buyPositionBefore = await waitForOptionPositionQuantity(
+                        instrumentIdA,
+                        OPTION_BUY_POSITION_LABEL
+                    );
+
+                    if (buyPositionBefore === null) {
+                        status.innerText =
+                            "موقعیت خرید A از تب موقعیت‌های اختیار قابل خواندن نیست؛ برای جلوگیری از فروش بدون خرید، سفارش ارسال نشد.";
+                        return;
+                    }
+
+                    if (optionExecutionStopRequested) {
+                        status.innerText = "اجرای موقعیت اول پیش از ثبت خرید متوقف شد.";
+                        return;
+                    }
+                }
+
                 progress.innerText =
                     `در حال ثبت خرید اولیه ${step}/${executionCount}...`;
 
@@ -1914,21 +2154,54 @@ async function sendInitialOptionPositionOrder() {
             }
 
             let buyExecuted = true;
+            let sellQuantityForStep = sellQuantityB;
+            let partialBuyFilledQuantity = 0;
 
             if (buyQuantityA > 0) {
                 status.innerText = "در حال بررسی انجام شدن خرید اولیه...";
 
-                buyExecuted = await isOptionBuyOrderExecuted({
-                    instrumentId: instrumentIdA,
-                    price: askA,
-                    quantity: buyQuantityA,
-                    orderResponse: buyResult
-                });
+                if (isOptionBuyPositionVerificationEnabled()) {
+                    const verification = await verifyOptionBuyFromPositions({
+                        instrumentId: instrumentIdA,
+                        quantity: buyQuantityA,
+                        positionBefore: buyPositionBefore,
+                        isStopRequested: () => optionExecutionStopRequested,
+                        progress
+                    });
+
+                    buyExecuted = verification.executed;
+
+                    if (!buyExecuted) {
+                        if (!verification.stopped && verification.filledQuantity > 0) {
+                            partialBuyFilledQuantity = verification.filledQuantity;
+                            sellQuantityForStep = Math.min(
+                                sellQuantityB,
+                                partialBuyFilledQuantity
+                            );
+                            buyExecuted = true;
+                            status.innerText =
+                                `خرید اولیه فقط ${partialBuyFilledQuantity} از ${buyQuantityA} انجام شد؛ فروش B به تعداد ${sellQuantityForStep} ارسال می‌شود.`;
+                        } else {
+                            status.innerText = verification.stopped
+                                ? "سفارش خرید اولیه ثبت شد؛ ادامه هنگام بررسی موقعیت متوقف شد و فروش انجام نشد."
+                                : "افزایش موقعیت خرید A تأیید نشد؛ فروش انجام نشد.";
+                        }
+                    }
+                } else {
+                    buyExecuted = await isOptionBuyOrderExecuted({
+                        instrumentId: instrumentIdA,
+                        price: askA,
+                        quantity: buyQuantityA,
+                        orderResponse: buyResult
+                    });
+                }
             }
 
             if (!buyExecuted) {
-                status.innerText =
-                    "سفارش خرید اولیه ثبت شد؛ تا انجام شدن خرید، ساخت استراتژی و فروش انجام نشد.";
+                if (!status.innerText) {
+                    status.innerText =
+                        "سفارش خرید اولیه ثبت شد؛ تا انجام شدن خرید، ساخت استراتژی و فروش انجام نشد.";
+                }
                 return;
             }
 
@@ -1938,7 +2211,7 @@ async function sendInitialOptionPositionOrder() {
             const strategyKey = await createInitialOptionStrategy({
                 instrumentIdA,
                 instrumentIdB,
-                quantity: buyQuantityA || sellQuantityB,
+                quantity: partialBuyFilledQuantity || buyQuantityA || sellQuantityB,
                 buyOrderResponse: buyResult
             });
 
@@ -1954,11 +2227,11 @@ async function sendInitialOptionPositionOrder() {
 
             const latestBidB = getBidB();
 
-            if (sellQuantityB > 0 && !latestBidB) {
+            if (sellQuantityForStep > 0 && !latestBidB) {
                 throw new Error("قیمت سرخط خرید نماد B پیدا نشد.");
             }
 
-            if (sellQuantityB > 0) {
+            if (sellQuantityForStep > 0) {
                 progress.innerText =
                     `در حال ثبت فروش ${step}/${executionCount}...`;
 
@@ -1966,7 +2239,7 @@ async function sendInitialOptionPositionOrder() {
                     instrumentId: instrumentIdB,
                     side: "Sell",
                     price: latestBidB,
-                    quantity: sellQuantityB,
+                    quantity: sellQuantityForStep,
                     strategyKey
                 });
             }
@@ -1974,6 +2247,12 @@ async function sendInitialOptionPositionOrder() {
             completedCount++;
             status.innerText =
                 `${completedCount} از ${executionCount} اجرای موقعیت اول انجام شد.`;
+
+            if (partialBuyFilledQuantity > 0) {
+                status.innerText =
+                    `خرید اولیه به‌صورت جزئی (${partialBuyFilledQuantity}) انجام شد و فروش B به تعداد ${sellQuantityForStep} ارسال شد؛ ادامه اجرا متوقف شد. مانده سفارش خرید A را بررسی کنید.`;
+                return;
+            }
 
             if (optionExecutionStopRequested) {
                 status.innerText =
@@ -2111,8 +2390,28 @@ async function sendOptionOffsetOrder() {
             }
 
             let buyResult = null;
+            let buyPositionBefore = null;
 
             if (buyQuantityB > 0) {
+                if (isOptionBuyPositionVerificationEnabled()) {
+                    progress.innerText = "در حال دریافت موقعیت فروش B...";
+                    buyPositionBefore = await waitForOptionPositionQuantity(
+                        instrumentIdB,
+                        OPTION_SELL_POSITION_LABEL
+                    );
+
+                    if (buyPositionBefore === null) {
+                        status.innerText =
+                            "موقعیت فروش B از تب موقعیت‌های اختیار قابل خواندن نیست؛ برای جلوگیری از آفست ناقص، سفارش ارسال نشد.";
+                        return;
+                    }
+
+                    if (optionOffsetExecutionStopRequested) {
+                        status.innerText = "اجرای آفست پیش از ثبت خرید متوقف شد.";
+                        return;
+                    }
+                }
+
                 progress.innerText =
                     `در حال ثبت خرید B ${step}/${executionCount}...`;
 
@@ -2136,21 +2435,56 @@ async function sendOptionOffsetOrder() {
             }
 
             let buyExecuted = true;
+            let sellQuantityForStep = sellQuantityA;
+            let partialBuyFilledQuantity = 0;
 
             if (buyQuantityB > 0) {
                 status.innerText = "در حال بررسی انجام شدن خرید نماد B...";
 
-                buyExecuted = await isOptionBuyOrderExecuted({
-                    instrumentId: instrumentIdB,
-                    price: askB,
-                    quantity: buyQuantityB,
-                    orderResponse: buyResult
-                });
+                if (isOptionBuyPositionVerificationEnabled()) {
+                    const verification = await verifyOptionBuyFromPositions({
+                        instrumentId: instrumentIdB,
+                        quantity: buyQuantityB,
+                        positionBefore: buyPositionBefore,
+                        positionLabel: OPTION_SELL_POSITION_LABEL,
+                        expectedDirection: "decrease",
+                        isStopRequested: () => optionOffsetExecutionStopRequested,
+                        progress
+                    });
+
+                    buyExecuted = verification.executed;
+
+                    if (!buyExecuted) {
+                        if (!verification.stopped && verification.filledQuantity > 0) {
+                            partialBuyFilledQuantity = verification.filledQuantity;
+                            sellQuantityForStep = Math.min(
+                                sellQuantityA,
+                                partialBuyFilledQuantity
+                            );
+                            buyExecuted = true;
+                            status.innerText =
+                                `خرید B فقط ${partialBuyFilledQuantity} از ${buyQuantityB} انجام شد؛ فروش A به تعداد ${sellQuantityForStep} ارسال می‌شود.`;
+                        } else {
+                            status.innerText = verification.stopped
+                                ? "سفارش خرید B ثبت شد؛ ادامه آفست هنگام بررسی موقعیت متوقف شد و فروش A ارسال نشد."
+                                : "کاهش موقعیت فروش B تأیید نشد؛ فروش A ارسال نشد.";
+                        }
+                    }
+                } else {
+                    buyExecuted = await isOptionBuyOrderExecuted({
+                        instrumentId: instrumentIdB,
+                        price: askB,
+                        quantity: buyQuantityB,
+                        orderResponse: buyResult
+                    });
+                }
             }
 
             if (!buyExecuted) {
-                status.innerText =
-                    "سفارش خرید B ثبت شد؛ بررسی انجام معامله هنوز پیاده‌سازی نشده و فروش A ارسال نشد.";
+                if (!status.innerText) {
+                    status.innerText =
+                        "سفارش خرید B ثبت شد؛ فروش A ارسال نشد.";
+                }
                 return;
             }
 
@@ -2164,11 +2498,11 @@ async function sendOptionOffsetOrder() {
 
             const latestBidA = getBidA();
 
-            if (sellQuantityA > 0 && !latestBidA) {
+            if (sellQuantityForStep > 0 && !latestBidA) {
                 throw new Error("قیمت سرخط خرید نماد A پیدا نشد.");
             }
 
-            if (sellQuantityA > 0) {
+            if (sellQuantityForStep > 0) {
                 progress.innerText =
                     `در حال ثبت فروش A ${step}/${executionCount}...`;
 
@@ -2176,7 +2510,7 @@ async function sendOptionOffsetOrder() {
                     instrumentId: instrumentIdA,
                     side: "Sell",
                     price: latestBidA,
-                    quantity: sellQuantityA,
+                    quantity: sellQuantityForStep,
                     strategyKey: optionStrategyUniqueKey
                 });
             }
@@ -2184,6 +2518,12 @@ async function sendOptionOffsetOrder() {
             completedCount++;
             status.innerText =
                 `${completedCount} از ${executionCount} اجرای آفست انجام شد.`;
+
+            if (partialBuyFilledQuantity > 0) {
+                status.innerText =
+                    `خرید B به‌صورت جزئی (${partialBuyFilledQuantity}) انجام شد و فروش A به تعداد ${sellQuantityForStep} ارسال شد؛ ادامه آفست متوقف شد. مانده سفارش خرید B را بررسی کنید.`;
+                return;
+            }
 
             if (optionOffsetExecutionStopRequested) {
                 status.innerText =
@@ -2434,9 +2774,18 @@ function bindSyncedQuantityInputs(firstId, secondId) {
 
 function checkBuyCondition(
     ask,
-    bid
+    bid,
+    askIsFallback = false,
+    bidIsFallback = false
 ) {
     byId("buy-return-row").classList.remove("return-hit");
+
+    const askElement = byId("ask-value");
+    const bidElement = byId("bid-value");
+    askElement.innerText = ask ?? "-";
+    bidElement.innerText = bid ?? "-";
+    askElement.classList.toggle("quote-fallback", askIsFallback);
+    bidElement.classList.toggle("quote-fallback", bidIsFallback);
 
     const buyCondition = getBuyConditionState(ask, bid);
 
@@ -2444,10 +2793,6 @@ function checkBuyCondition(
         updateOptionAlarmState("buy", false, buyCondition.expected);
         return;
     }
-
-    byId("ask-value").innerText = ask;
-
-    byId("bid-value").innerText = bid;
 
     byId("buy-spread-value").innerText = buyCondition.spread;
 
@@ -2477,17 +2822,24 @@ function checkBuyCondition(
 
 function checkSellCondition(
     bidA,
-    askB
+    askB,
+    bidAIsFallback = false,
+    askBIsFallback = false
 ) {
     byId("sell-return-row").classList.remove("return-hit");
+
+    const bidAElement = byId("sell-bid-a-value");
+    const askBElement = byId("sell-ask-b-value");
+    bidAElement.innerText = bidA ?? "-";
+    askBElement.innerText = askB ?? "-";
+    bidAElement.classList.toggle("quote-fallback", bidAIsFallback);
+    askBElement.classList.toggle("quote-fallback", askBIsFallback);
 
     const offsetCondition = getOffsetConditionState(
         bidA,
         askB
     );
 
-    byId("sell-bid-a-value").innerText = bidA;
-    byId("sell-ask-b-value").innerText = askB;
     byId("sell-spread-value").innerText = offsetCondition.spread;
 
     if (offsetCondition.offsetReturn === null) {
@@ -2583,6 +2935,7 @@ function startOptionMonitoringIfReady() {
     startOptionMonitoring(false);
 }
 
+if (false) {
 loadOptionPreferences();
 bindOptionPreferencePersistence();
 bindSyncedQuantityInputs("opt-buy-quantity", "opt-buy-sell-quantity");
@@ -2736,4 +3089,248 @@ setInterval(() => {
     });
     syncInitialPositionButtonVisibility();
 }, 2000);
+}
+
+/* Multi-pair option UI -------------------------------------------------- */
+const PAIRS_STORAGE_KEY = "ppt-option-pairs:v1";
+const GLOBAL_STORAGE_KEY = "ppt-option-global-settings:v1";
+let pairStates = [];
+let pairTaskQueue = Promise.resolve();
+
+function createPairState(source = {}) {
+    return {
+        id: source.id || `pair-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        symbolA: source.symbolA || "", symbolB: source.symbolB || "", strategyKey: source.strategyKey || "",
+        quantities: { openBuyA: source.quantities?.openBuyA ?? 10, openSellB: source.quantities?.openSellB ?? 10, offsetBuyB: source.quantities?.offsetBuyB ?? 10, offsetSellA: source.quantities?.offsetSellA ?? 10 },
+        values: { maxValue: source.values?.maxValue ?? "", premium: source.values?.premium ?? "", expectedReturn: source.values?.expectedReturn ?? "", expectedOffsetReturn: source.values?.expectedOffsetReturn ?? "" },
+        executionCount: source.executionCount || 1,
+        offsetExecutionCount: source.offsetExecutionCount || 1,
+        alarm: { buy: { isHit: false, signature: null }, offset: { isHit: false, signature: null } },
+        openStopRequested: false, offsetStopRequested: false
+    };
+}
+
+function savePairs() { localStorage.setItem(PAIRS_STORAGE_KEY, JSON.stringify(pairStates.map(pair => ({ id: pair.id, symbolA: pair.symbolA, symbolB: pair.symbolB, strategyKey: pair.strategyKey, quantities: pair.quantities, values: pair.values, executionCount: pair.executionCount, offsetExecutionCount: pair.offsetExecutionCount })))); }
+function loadPairs() { try { const saved = JSON.parse(localStorage.getItem(PAIRS_STORAGE_KEY) || "null"); pairStates = Array.isArray(saved) && saved.length ? saved.map(createPairState) : [createPairState()]; } catch (_) { pairStates = [createPairState()]; } }
+function saveGlobalSettings() { const ids = ["opt-auto-values", "opt-auto-buy-buttons", "opt-sync-order-quantities", "opt-verify-buy-position", "opt-alarm-enabled"]; const values = Object.fromEntries(ids.map(id => [id, byId(id)?.checked])); ["opt-alarm-count", "opt-alarm-interval"].forEach(id => values[id] = byId(id)?.value); values["opt-settings-open"] = !byId("opt-settings-body")?.hidden; localStorage.setItem(GLOBAL_STORAGE_KEY, JSON.stringify(values)); }
+function loadGlobalSettings() { let values = {}; try { values = JSON.parse(localStorage.getItem(GLOBAL_STORAGE_KEY) || "{}"); } catch (_) {} ["opt-auto-values", "opt-auto-buy-buttons", "opt-sync-order-quantities", "opt-verify-buy-position", "opt-alarm-enabled"].forEach(id => { if (typeof values[id] === "boolean") byId(id).checked = values[id]; }); ["opt-alarm-count", "opt-alarm-interval"].forEach(id => { if (values[id] !== undefined) byId(id).value = values[id]; }); if (values["opt-settings-open"]) { byId("opt-settings-body").hidden = false; byId("opt-settings-toggle").innerText = "-"; } }
+function getPairCard(pair) { return root.querySelector(`[data-pair-id="${CSS.escape(pair.id)}"]`); }
+function pairElement(pair, id) { return getPairCard(pair)?.querySelector(`#${id}`); }
+async function withPair(pair, task) {
+    const run = pairTaskQueue.then(async () => {
+        const oldRoot = activePairRoot, oldAlarm = optionAlarmStates;
+        activePairRoot = getPairCard(pair);
+        optionAlarmStates = pair.alarm;
+        try { return await task(); }
+        finally { activePairRoot = oldRoot; optionAlarmStates = oldAlarm; }
+    });
+    pairTaskQueue = run.catch(() => {});
+    return run;
+}
+
+function renderPair(pair) {
+    const card = byId("opt-pair-template").content.firstElementChild.cloneNode(true);
+    card.dataset.pairId = pair.id;
+    card.querySelector("#opt-symbol-a").value = pair.symbolA; card.querySelector("#opt-symbol-b").value = pair.symbolB;
+    card.querySelector("#opt-buy-quantity").value = pair.quantities.openBuyA; card.querySelector("#opt-buy-sell-quantity").value = pair.quantities.openSellB;
+    card.querySelector("#opt-offset-buy-quantity").value = pair.quantities.offsetBuyB; card.querySelector("#opt-sell-quantity").value = pair.quantities.offsetSellA; card.querySelector("#opt-buy-execution-count").value = pair.executionCount; card.querySelector("#opt-sell-execution-count").value = pair.offsetExecutionCount;
+    card.querySelector("#opt-max-value").value = pair.values.maxValue; card.querySelector("#opt-premium").value = pair.values.premium; card.querySelector("#opt-expected-return").value = pair.values.expectedReturn; card.querySelector("#opt-expected-offset-return").value = pair.values.expectedOffsetReturn;
+    return card;
+}
+function renderAllPairs() { const container = byId("opt-pairs"); container.innerHTML = ""; pairStates.forEach(pair => container.appendChild(renderPair(pair))); bindPairEvents(); bindPairQuantitySync(); }
+function fillPairSymbols(card, symbols) {
+    const pair = pairStates.find(item => item.id === card.dataset.pairId);
+    const pairIndex = Math.max(0, pairStates.indexOf(pair));
+    ["opt-symbol-a", "opt-symbol-b"].forEach(id => {
+        const select = card.querySelector(`#${id}`);
+        const pairValue = id === "opt-symbol-a" ? pair?.symbolA : pair?.symbolB;
+        const defaultIndex = pairIndex * 2 + (id === "opt-symbol-b" ? 1 : 0);
+        const defaultSymbol = symbols[defaultIndex];
+        const shouldUseIndexedDefault = !pairValue && defaultSymbol;
+        select.innerHTML = "";
+        symbols.forEach(symbol => {
+            const option = document.createElement("option");
+            option.value = symbol.instrumentId;
+            option.innerText = symbol.title;
+            select.appendChild(option);
+        });
+        if (shouldUseIndexedDefault) {
+            select.value = defaultSymbol.instrumentId;
+        } else if (pairValue && symbols.some(symbol => symbol.instrumentId === pairValue)) {
+            select.value = pairValue;
+        } else if (pairValue) {
+            const missing = document.createElement("option");
+            missing.value = pairValue;
+            missing.innerText = `${pairValue} (در دیده‌بان پیدا نشد)`;
+            select.appendChild(missing);
+            select.value = pairValue;
+        } else if (pairValue) {
+            select.value = "";
+        }
+    });
+}
+async function refreshAllPairs() {
+    const symbols = await brokerAdapter.getOptionSymbols();
+    root.querySelectorAll("#opt-pairs .option-pair-card").forEach(card => fillPairSymbols(card, symbols));
+    pairStates.forEach(pair => {
+        pair.symbolA = pairElement(pair, "opt-symbol-a")?.value || pair.symbolA;
+        pair.symbolB = pairElement(pair, "opt-symbol-b")?.value || pair.symbolB;
+    });
+    savePairs();
+    await Promise.all(pairStates.map(pair => withPair(pair, async () => {
+        optionStrategiesSignature = null;
+        await refreshOptionStrategies();
+        const strategy = pairElement(pair, "opt-strategy");
+        if (pair.strategyKey && strategy && Array.from(strategy.options).some(option => option.value === pair.strategyKey)) strategy.value = pair.strategyKey;
+        await updateAutoOptionValues();
+        syncPairFromDom(pair);
+        syncInitialPositionButtonVisibility();
+    })));
+}
+function syncPairFromDom(pair) { pair.symbolA = pairElement(pair, "opt-symbol-a")?.value || ""; pair.symbolB = pairElement(pair, "opt-symbol-b")?.value || ""; pair.strategyKey = getSelectedOptionStrategyKey() || pair.strategyKey; pair.quantities.openBuyA = Number(pairElement(pair, "opt-buy-quantity")?.value || 0); pair.quantities.openSellB = Number(pairElement(pair, "opt-buy-sell-quantity")?.value || 0); pair.quantities.offsetBuyB = Number(pairElement(pair, "opt-offset-buy-quantity")?.value || 0); pair.quantities.offsetSellA = Number(pairElement(pair, "opt-sell-quantity")?.value || 0); pair.executionCount = Number(pairElement(pair, "opt-buy-execution-count")?.value || 1); pair.offsetExecutionCount = Number(pairElement(pair, "opt-sell-execution-count")?.value || 1); pair.values.maxValue = pairElement(pair, "opt-max-value")?.value || ""; pair.values.premium = pairElement(pair, "opt-premium")?.value || ""; pair.values.expectedReturn = pairElement(pair, "opt-expected-return")?.value || ""; pair.values.expectedOffsetReturn = pairElement(pair, "opt-expected-offset-return")?.value || ""; savePairs(); }
+
+function getMonitorQuote(preferred, fallback) {
+    const preferredNumber = Number(preferred);
+    const fallbackNumber = Number(fallback);
+
+    if (Number.isFinite(preferredNumber) && preferredNumber > 0) {
+        return { value: preferredNumber, isFallback: false };
+    }
+
+    if (Number.isFinite(fallbackNumber) && fallbackNumber > 0) {
+        return { value: fallbackNumber, isFallback: true };
+    }
+
+    return { value: null, isFallback: false };
+}
+
+async function updatePair(pair) {
+    if (!pair.symbolA || !pair.symbolB) return;
+
+    await withPair(pair, async () => {
+        if (brokerAdapter.refreshOptionMarketData) {
+            await brokerAdapter.refreshOptionMarketData().catch(() => {});
+        }
+
+        const rawAskA = getAskA();
+        const rawBidA = getBidA();
+        const rawBidB = getBidB();
+        const rawAskB = getAskB();
+
+        const buyAsk = getMonitorQuote(rawAskA, rawBidA);
+        const buyBid = getMonitorQuote(rawBidB, rawAskB);
+        const offsetBid = getMonitorQuote(rawBidA, rawAskA);
+        const offsetAsk = getMonitorQuote(rawAskB, rawBidB);
+
+        if (buyAsk.value != null && buyBid.value != null) {
+            checkBuyCondition(
+                buyAsk.value,
+                buyBid.value,
+                buyAsk.isFallback,
+                buyBid.isFallback
+            );
+        } else {
+            updateOptionAlarmState("buy", false);
+        }
+
+        if (offsetBid.value != null && offsetAsk.value != null) {
+            checkSellCondition(
+                offsetBid.value,
+                offsetAsk.value,
+                offsetBid.isFallback,
+                offsetAsk.isFallback
+            );
+        } else {
+            updateOptionAlarmState("offset", false);
+        }
+    });
+}
+function bindPairEvents() { root.querySelectorAll("#opt-pairs .option-pair-card").forEach(card => { const pair = pairStates.find(item => item.id === card.dataset.pairId); if (!pair) return; ["opt-symbol-a", "opt-symbol-b", "opt-strategy", "opt-buy-quantity", "opt-buy-sell-quantity", "opt-offset-buy-quantity", "opt-sell-quantity", "opt-buy-execution-count", "opt-sell-execution-count", "opt-max-value", "opt-premium", "opt-expected-return", "opt-expected-offset-return"].forEach(id => card.querySelector(`#${id}`).addEventListener("change", () => withPair(pair, async () => { syncPairFromDom(pair); optionStrategiesSignature = null; await refreshOptionStrategies(); await updateAutoOptionValues(); syncPairFromDom(pair); }))); card.querySelector('[data-action="remove-pair"]').onclick = () => { if (pairStates.length > 1) { pairStates = pairStates.filter(item => item !== pair); renderAllPairs(); savePairs(); } }; card.querySelector("#opt-buy-order").onclick = () => withPair(pair, sendOptionBuyOrder); card.querySelector("#opt-initial-position-order").onclick = () => withPair(pair, sendInitialOptionPositionOrder); card.querySelector("#opt-sell-order").onclick = () => withPair(pair, sendOptionOffsetOrder); card.querySelector("#opt-stop-execution").onclick = () => { optionExecutionStopRequested = true; pair.openStopRequested = true; }; card.querySelector("#opt-stop-offset-execution").onclick = () => { optionOffsetExecutionStopRequested = true; pair.offsetStopRequested = true; }; }); }
+function bindPairQuantitySync() {
+    const quantityPairs = [
+        ["opt-buy-quantity", "opt-buy-sell-quantity"],
+        ["opt-offset-buy-quantity", "opt-sell-quantity"]
+    ];
+
+    root.querySelectorAll("#opt-pairs .option-pair-card").forEach(card => {
+        const pair = pairStates.find(item => item.id === card.dataset.pairId);
+
+        if (!pair)
+            return;
+
+        quantityPairs.forEach(([firstId, secondId]) => {
+            const first = card.querySelector(`#${firstId}`);
+            const second = card.querySelector(`#${secondId}`);
+
+            if (byId("opt-sync-order-quantities")?.checked) {
+                second.value = first.value;
+            }
+
+            first.addEventListener("input", () => {
+                if (!byId("opt-sync-order-quantities")?.checked)
+                    return;
+
+                second.value = first.value;
+                withPair(pair, async () => syncPairFromDom(pair));
+            });
+
+            second.addEventListener("input", () => {
+                if (!byId("opt-sync-order-quantities")?.checked)
+                    return;
+
+                first.value = second.value;
+                withPair(pair, async () => syncPairFromDom(pair));
+            });
+        });
+
+        if (byId("opt-sync-order-quantities")?.checked) {
+            withPair(pair, async () => syncPairFromDom(pair));
+        }
+    });
+}
+
+function syncAllPairQuantities() {
+    if (!byId("opt-sync-order-quantities")?.checked)
+        return;
+
+    root.querySelectorAll("#opt-pairs .option-pair-card").forEach(card => {
+        const pair = pairStates.find(item => item.id === card.dataset.pairId);
+
+        if (!pair)
+            return;
+
+        [
+            ["opt-buy-quantity", "opt-buy-sell-quantity"],
+            ["opt-offset-buy-quantity", "opt-sell-quantity"]
+        ].forEach(([firstId, secondId]) => {
+            card.querySelector(`#${secondId}`).value =
+                card.querySelector(`#${firstId}`).value;
+        });
+
+        withPair(pair, async () => syncPairFromDom(pair));
+    });
+}
+function getActivePair() { return pairStates.find(pair => getPairCard(pair) === activePairRoot); }
+function getAskA() { return brokerAdapter.getOptionQuote(pairElement(getActivePair(), "opt-symbol-a")?.value)?.ask; }
+function getBidB() { return brokerAdapter.getOptionQuote(pairElement(getActivePair(), "opt-symbol-b")?.value)?.bid; }
+function getBidA() { return brokerAdapter.getOptionQuote(pairElement(getActivePair(), "opt-symbol-a")?.value)?.bid; }
+function getAskB() { return brokerAdapter.getOptionQuote(pairElement(getActivePair(), "opt-symbol-b")?.value)?.ask; }
+function addPair() { pairStates.push(createPairState()); renderAllPairs(); savePairs(); refreshAllPairs().catch(showOptionError); }
+function showOptionError(error) { byId("option-symbols-status").innerText = error.message; }
+
+byId("opt-add-pair").onclick = addPair;
+byId("opt-refresh-pairs").onclick = () => refreshAllPairs().catch(showOptionError);
+byId("opt-settings-toggle").onclick = () => { const body = byId("opt-settings-body"); body.hidden = !body.hidden; byId("opt-settings-toggle").innerText = body.hidden ? "+" : "-"; saveGlobalSettings(); };
+["opt-auto-values", "opt-auto-buy-buttons", "opt-sync-order-quantities", "opt-verify-buy-position", "opt-alarm-enabled", "opt-alarm-count", "opt-alarm-interval"].forEach(id => byId(id).addEventListener("change", () => {
+    saveGlobalSettings();
+    if (id === "opt-alarm-enabled") syncOptionAlarmControlsVisibility();
+    if (id === "opt-sync-order-quantities") syncAllPairQuantities();
+    if (id === "opt-auto-buy-buttons") {
+        pairStates.forEach(pair => withPair(pair, async () => syncInitialPositionButtonVisibility()));
+    }
+}));
+byId("opt-settings-reset").onclick = () => { localStorage.removeItem(GLOBAL_STORAGE_KEY); location.reload(); };
+loadPairs(); loadGlobalSettings(); renderAllPairs(); refreshAllPairs().catch(showOptionError);
+setInterval(() => refreshAllPairs().catch(showOptionError), 2000);
+setInterval(() => pairStates.forEach(pair => updatePair(pair).catch(() => {})), 1000);
 /*---------------------------------------------------------------------*/

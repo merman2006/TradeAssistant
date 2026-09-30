@@ -1,230 +1,117 @@
 <div id="ppt-panel">
-
     <div id="ppt-header">
-
-        <div class="ppt-title">
-            Trade Assistant
-        </div>
-
-        <div class="ppt-actions">
-            <button id="ppt-minimize">—</button>
-        </div>
-
+        <div class="ppt-title">Trade Assistant</div>
+        <div class="ppt-actions"><button id="ppt-minimize">—</button></div>
     </div>
 
     <div id="ppt-tabs">
-
-        <button class="ppt-tab stock-tab" data-tab="stock" hidden>
-            معاملات سهام
-        </button>
-
-        <button class="ppt-tab active" data-tab="option">
-            معاملات مشتقه
-        </button>
-
+        <button class="ppt-tab stock-tab" data-tab="stock" hidden>معاملات سهام</button>
+        <button class="ppt-tab active" data-tab="option">معاملات مشتقه</button>
     </div>
 
     <div id="ppt-stock" class="ppt-content">
-
         <input id="search" placeholder="جستجوی نماد">
-
-        <button id="searchBtn" class="primary-btn">
-            جستجو
-        </button>
-
+        <button id="searchBtn" class="primary-btn">جستجو</button>
         <div id="results"></div>
-
-        <div id="selected">
-            هیچ نمادی انتخاب نشده
-        </div>
-
+        <div id="selected">هیچ نمادی انتخاب نشده</div>
         <input id="price" placeholder="قیمت">
-
         <input id="qty" placeholder="حجم">
-
-        <div class="btn-row">
-
-            <button id="buy" class="buy-btn">
-                ثبت خرید
-            </button>
-
-            <button id="sell" class="sell-btn">
-                ثبت فروش
-            </button>
-
-        </div>
-
+        <div class="btn-row"><button id="buy" class="buy-btn">ثبت خرید</button><button id="sell" class="sell-btn">ثبت فروش</button></div>
         <pre id="log"></pre>
-
     </div>
 
     <div id="ppt-option" class="ppt-content active">
-        <div class="option-monitor-actions">
-            <button id="opt-start" class="buy-btn">
-                شروع مانیتورینگ
-            </button>
-
-            <button id="opt-stop" class="sell-btn" disabled>
-                توقف
-            </button>
+        <div class="option-toolbar">
+            <button id="opt-add-pair" class="primary-btn" type="button">+ افزودن زوج</button>
+            <button id="opt-refresh-pairs" type="button">بازخوانی نمادها</button>
+            <span id="option-symbols-status"></span>
         </div>
 
-        <div class="ppt-card option-symbols-card">
-            <div class="option-symbol-field">
-                <label for="opt-symbol-a">نماد A</label>
-                <select id="opt-symbol-a">
-                    <option value="">در حال دریافت نمادها...</option>
-                </select>
+        <div class="ppt-card option-global-settings">
+            <div class="option-settings-heading"><button id="opt-settings-toggle" type="button">+</button><span>تنظیمات کلی همه زوج‌ها</span></div>
+            <div id="opt-settings-body" class="option-settings-body" hidden>
+                <label class="option-check-row"><input id="opt-auto-values" type="checkbox" checked><span>پر کردن خودکار پریمیوم و بیشترین اسپرد</span></label>
+                <label class="option-check-row"><input id="opt-auto-buy-buttons" type="checkbox" checked><span>نمایش خودکار دکمه‌های خرید</span></label>
+                <label class="option-check-row"><input id="opt-sync-order-quantities" type="checkbox" checked><span>برابر نگه داشتن تعدادهای خرید و فروش</span></label>
+                <label class="option-check-row"><input id="opt-verify-buy-position" type="checkbox" checked><span>تأیید انجام خرید از موقعیت‌های اختیار</span></label>
+                <div id="opt-alarm-row" class="option-alarm-row">
+                    <label class="option-check-row"><input id="opt-alarm-enabled" type="checkbox" checked><span>آلارم</span></label>
+                    <label id="opt-alarm-count-field" class="option-alarm-field"><span>تعداد</span><input id="opt-alarm-count" type="number" min="1" max="20" value="5"></label>
+                    <label id="opt-alarm-interval-field" class="option-alarm-field"><span>فاصله</span><input id="opt-alarm-interval" type="number" min="100" step="50" value="500"><span>میلی‌ثانیه</span></label>
+                </div>
+                <button id="opt-settings-reset" type="button">ریست تنظیمات کلی</button>
             </div>
+        </div>
 
-            <div class="option-symbol-field">
-                <label for="opt-symbol-b">نماد B</label>
-                <select id="opt-symbol-b">
-                    <option value="">در حال دریافت نمادها...</option>
-                </select>
+        <div class="pairs-table-scroll">
+            <div class="pair-table-header">
+                <div class="pair-table-header-box pair-identity-header">
+                    <span></span><span title="نماد A">نماد A</span><span title="نماد B">نماد B</span><span title="استراتژی">استراتژی</span>
+                </div>
+                <div class="pair-table-header-box pair-open-header">
+                    <span title="بیشترین اسپرد">بیشترین اسپرد</span><span title="حداقل بازده">حداقل بازده</span><span title="Ask(A)">Ask(A)</span><span title="Bid(B)">Bid(B)</span><span title="Spread">Spread</span><span title="BuyReturn">BuyReturn</span><span title="تعداد">تعداد</span><span title="خرید A">خرید A</span><span title="فروش B">فروش B</span><span title="بازکردن">بازکردن</span><span title="م اول">م اول</span><span title="توقف">توقف</span>
+                </div>
+                <div class="pair-table-header-box pair-offset-header">
+                    <span title="پریمیوم">پریمیوم</span><span title="حداقل بازده آفست">حداقل بازده آفست</span><span title="Bid(A)">Bid(A)</span><span title="Ask(B)">Ask(B)</span><span title="Spread">Spread</span><span title="OffsetReturn">OffsetReturn</span><span title="تعداد">تعداد</span><span title="خرید B">خرید B</span><span title="فروش A">فروش A</span><span title="آفست">آفست</span><span title="توقف">توقف</span>
+                </div>
             </div>
+            <div id="opt-pairs" class="option-pairs"></div>
+        </div>
 
-            <div class="option-strategy-field">
-                <label for="opt-strategy">استراتژی</label>
-                <select id="opt-strategy">
-                    <option value="">در حال دریافت استراتژی‌ها...</option>
-                </select>
-            </div>
-
-            <div class="option-settings">
-                <button id="opt-settings-toggle" type="button">+</button>
-                <span>تنظیمات</span>
-
-                <div id="opt-settings-body" class="option-settings-body" hidden>
-                    <label class="option-check-row">
-                        <input id="opt-auto-values" type="checkbox" checked>
-                        <span>پر کردن خودکار پریمیوم و بیشترین اسپرد</span>
-                    </label>
-
-                    <label class="option-check-row">
-                        <input id="opt-auto-buy-buttons" type="checkbox" checked>
-                        <span>نمایش خودکار دکمه‌های خرید</span>
-                    </label>
-
-                    <label class="option-check-row">
-                        <input id="opt-sync-order-quantities" type="checkbox" checked>
-                        <span>برابر نگه داشتن تعدادهای خرید و فروش</span>
-                    </label>
-
-                    <div id="opt-alarm-row" class="option-alarm-row">
-                        <label class="option-check-row">
-                            <input id="opt-alarm-enabled" type="checkbox" checked>
-                            <span>آلارم</span>
-                        </label>
-
-                        <label id="opt-alarm-count-field" class="option-alarm-field">
-                            <span>تعداد</span>
-                            <input id="opt-alarm-count" type="number" min="1" max="20" value="5">
-                        </label>
-
-                        <label id="opt-alarm-interval-field" class="option-alarm-field option-alarm-interval-field">
-                            <span>فاصله</span>
-                            <input id="opt-alarm-interval" type="number" min="100" step="50" value="500">
-                            <span>میلی ثانیه</span>
-                        </label>
+        <template id="opt-pair-template">
+            <article class="option-pair-card" data-pair-id="">
+                <div class="pair-symbol-row">
+                    <div class="pair-symbols">
+                        <button class="pair-remove" data-action="remove-pair" type="button" aria-label="حذف زوج">×</button>
+                        <label><select id="opt-symbol-a"><option value="">در حال دریافت نمادها...</option></select></label>
+                        <label><select id="opt-symbol-b"><option value="">در حال دریافت نمادها...</option></select></label>
                     </div>
-
-                    <button id="opt-settings-reset" type="button">
-                        ریست تنظیمات
-                    </button>
+                    <label class="pair-strategy"><select id="opt-strategy"><option value="">در حال دریافت استراتژی‌ها...</option></select></label>
                 </div>
-            </div>
-
-            <div id="option-symbols-status"></div>
-        </div>
-
-        <div class="option-positions">
-            <section class="option-position-card buy-position">
-                <div class="option-inputs">
-                    <label for="opt-max-value">بیشترین اسپرد</label>
-                    <input id="opt-max-value" type="number">
-
-                    <label for="opt-expected-return">حداقل بازده سرخط</label>
-                    <input id="opt-expected-return" type="number" step="0.01">
+                <div class="pair-monitor-row">
+                    <section class="pair-monitor-section pair-open-section">
+                        <div class="pair-values">
+                            <label><input id="opt-max-value" type="text"></label>
+                            <label><input id="opt-expected-return" type="text"></label>
+                        </div>
+                        <div class="pair-quotes">
+                            <span><b id="ask-value">-</b></span><span><b id="bid-value">-</b></span>
+                        </div>
+                        <div class="pair-returns">
+                            <span><b id="buy-spread-value">-</b></span><span id="buy-return-row"><b id="buy-return-value">-</b></span>
+                        </div>
+                        <div class="pair-orders">
+                            <label><input id="opt-buy-execution-count" type="number" min="1" value="1"></label>
+                            <label><input id="opt-buy-quantity" type="number" min="0" value="10"></label>
+                            <label><input id="opt-buy-sell-quantity" type="number" min="0" value="10"></label>
+                            <button id="opt-buy-order" class="buy-btn" type="button">بازکردن</button>
+                            <button id="opt-initial-position-order" class="buy-btn" type="button">م اول</button>
+                            <button id="opt-stop-execution" class="sell-btn" type="button" disabled>توقف</button>
+                        </div>
+                        <div class="pair-status"><span id="opt-execution-progress"></span></div>
+                    </section>
+                    <section class="pair-monitor-section pair-offset-section">
+                        <div class="pair-values">
+                            <label><input id="opt-premium" type="text"></label>
+                            <label><input id="opt-expected-offset-return" type="text"></label>
+                        </div>
+                        <div class="pair-quotes">
+                            <span><b id="sell-bid-a-value">-</b></span><span><b id="sell-ask-b-value">-</b></span>
+                        </div>
+                        <div class="pair-returns">
+                            <span><b id="sell-spread-value">-</b></span><span id="sell-return-row"><b id="sell-return-value">-</b></span>
+                        </div>
+                        <div class="pair-orders">
+                            <label><input id="opt-sell-execution-count" type="number" min="1" value="1"></label>
+                            <label><input id="opt-offset-buy-quantity" type="number" min="0" value="10"></label>
+                            <label><input id="opt-sell-quantity" type="number" min="0" value="10"></label>
+                            <button id="opt-sell-order" class="sell-btn" type="button">آفست</button>
+                            <button id="opt-stop-offset-execution" class="sell-btn" type="button" disabled>توقف</button>
+                        </div>
+                        <div class="pair-status"><span id="opt-offset-execution-progress"></span></div>
+                    </section>
                 </div>
-
-                <div class="ppt-stats">
-                    <div>Ask(A): <span id="ask-value">-</span></div>
-
-                    <div>Bid(B): <span id="bid-value">-</span></div>
-
-                    <div>Spread: <span id="buy-spread-value">-</span></div>
-
-                    <div id="buy-return-row">BuyReturn: <span id="buy-return-value">-</span></div>
-                </div>
-
-                <div class="option-order-fields">
-                    <label for="opt-buy-execution-count">تعداد اجرا</label>
-                    <input id="opt-buy-execution-count" type="number" min="1" value="1">
-
-                    <label for="opt-buy-quantity">تعداد خرید A</label>
-                    <input id="opt-buy-quantity" type="number" min="0" value="10">
-
-                    <label for="opt-buy-sell-quantity">تعداد فروش B</label>
-                    <input id="opt-buy-sell-quantity" type="number" min="0" value="10">
-
-                    <button id="opt-buy-order" class="buy-btn" type="button">
-                        باز کردن موقعیت
-                    </button>
-
-                    <button id="opt-initial-position-order" class="buy-btn" type="button">
-                        موقعیت اول
-                    </button>
-
-                    <button id="opt-stop-execution" class="sell-btn" type="button" disabled>
-                        توقف اجرا
-                    </button>
-
-                    <span id="opt-execution-progress"></span>
-                </div>
-            </section>
-
-            <section class="option-position-card sell-position">
-                <div class="option-inputs">
-                    <label for="opt-premium">پریمیوم</label>
-                    <input id="opt-premium" type="number">
-
-                    <label for="opt-expected-offset-return">حداقل بازده آفست</label>
-                    <input id="opt-expected-offset-return" type="number" step="0.01">
-                </div>
-
-                <div class="ppt-stats">
-                    <div>Ask(B): <span id="sell-ask-b-value">-</span></div>
-                    <div>Bid(A): <span id="sell-bid-a-value">-</span></div>
-
-                    <div>Spread: <span id="sell-spread-value">-</span></div>
-
-                    <div id="sell-return-row">OffsetReturn: <span id="sell-return-value">-</span></div>
-                </div>
-
-                <div class="option-order-fields">
-                    <label for="opt-sell-execution-count">تعداد اجرا</label>
-                    <input id="opt-sell-execution-count" type="number" min="1" value="1">
-
-                    <label for="opt-offset-buy-quantity">تعداد خرید B</label>
-                    <input id="opt-offset-buy-quantity" type="number" min="0" value="10">
-
-                    <label for="opt-sell-quantity">تعداد فروش A</label>
-                    <input id="opt-sell-quantity" type="number" min="0" value="10">
-
-                    <button id="opt-sell-order" class="sell-btn" type="button">
-                        آفست موقعیت
-                    </button>
-
-                    <button id="opt-stop-offset-execution" class="sell-btn" type="button" disabled>
-                        توقف اجرا
-                    </button>
-
-                    <span id="opt-offset-execution-progress"></span>
-                </div>
-            </section>
-        </div>
-
+            </article>
+        </template>
     </div>
-
 </div>
