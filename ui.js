@@ -316,10 +316,18 @@ function createFallbackBrokerAdapter(config) {
             const ask = container?.querySelector(
                 'client-instrument-price-position-row[orderside="Sell"] .-is-price .-is-clickable'
             );
+            const bidQuantity = container?.querySelector(
+                'client-instrument-price-position-row[orderside="Buy"] .-is-quantity .-is-clickable'
+            );
+            const askQuantity = container?.querySelector(
+                'client-instrument-price-position-row[orderside="Sell"] .-is-quantity .-is-clickable'
+            );
 
             return {
                 bid: parseOptionNumber(bid?.innerText),
-                ask: parseOptionNumber(ask?.innerText)
+                ask: parseOptionNumber(ask?.innerText),
+                bidQuantity: parseOptionNumber(bidQuantity?.innerText),
+                askQuantity: parseOptionNumber(askQuantity?.innerText)
             };
         },
 
@@ -493,6 +501,9 @@ byId("ppt-minimize")
             "minimized",
             current.classList.contains("minimized")
         );
+        byId("ppt-minimize").innerText = current.classList.contains("minimized")
+            ? "+"
+            : "—";
         derivativePanelManualOverride =
             current.id === "ppt-option" &&
             !current.classList.contains("minimized");
@@ -529,7 +540,7 @@ syncDerivativeTabVisibility();
     let startOffsetX = 0;
     let startOffsetY = 0;
 
-    const positionStorageKey = "ppt-panel-position:v1";
+    const positionStorageKey = "ppt-panel-position:v2";
     let offsetX = 0;
     let offsetY = 0;
 
@@ -602,6 +613,7 @@ const OPTION_PERSISTED_FIELDS = [
     { id: "opt-auto-values", type: "checkbox" },
     { id: "opt-auto-buy-buttons", type: "checkbox" },
     { id: "opt-sync-order-quantities", type: "checkbox" },
+    { id: "opt-limit-order-quantity-to-queue", type: "checkbox" },
     { id: "opt-verify-buy-position", type: "checkbox" },
     { id: "opt-alarm-enabled", type: "checkbox" },
     { id: "opt-alarm-count", type: "value" },
@@ -965,6 +977,18 @@ async function verifyOptionBuyFromPositions({
     }
 
     return { executed: false, stopped: false, filledQuantity };
+}
+
+async function cancelTimedOutOptionOrder(orderResponse, progress) {
+
+    if (typeof brokerAdapter.cancelOptionOrder !== "function") {
+        throw new Error(
+            "لغو خودکار سفارش برای این کارگزاری پشتیبانی نمی‌شود."
+        );
+    }
+
+    progress.innerText = "در حال لغو مانده سفارش خرید...";
+    return brokerAdapter.cancelOptionOrder(orderResponse);
 }
 
 async function updateAutoOptionValues() {
@@ -1662,6 +1686,70 @@ function getOffsetConditionState(bidA, askB) {
     };
 }
 
+function isOrderQuantityLimitedToQueue() {
+
+    return !!byId("opt-limit-order-quantity-to-queue")?.checked;
+}
+
+function getQueueOrderQuantities({
+    buyQuantity,
+    sellQuantity,
+    availableBuyQuantity,
+    availableSellQuantity
+}) {
+
+    const defaultQuantities = {
+        buyQuantity,
+        sellQuantity,
+        isQueueLimited: false
+    };
+
+    // Separate quantities can encode an intentional leg ratio.  In that case
+    // preserve the user's configured quantities exactly.
+    if (
+        !isOrderQuantityLimitedToQueue() ||
+        buyQuantity !== sellQuantity ||
+        buyQuantity <= 0
+    ) {
+        return defaultQuantities;
+    }
+
+    if (
+        availableBuyQuantity === null ||
+        availableBuyQuantity === undefined ||
+        availableSellQuantity === null ||
+        availableSellQuantity === undefined
+    ) {
+        return defaultQuantities;
+    }
+
+    const buyAvailable = Number(availableBuyQuantity);
+    const sellAvailable = Number(availableSellQuantity);
+
+    if (
+        !Number.isInteger(buyAvailable) ||
+        buyAvailable < 0 ||
+        !Number.isInteger(sellAvailable) ||
+        sellAvailable < 0
+    ) {
+        // A broker that does not expose top-of-book volume keeps the existing
+        // behavior rather than guessing a safe volume.
+        return defaultQuantities;
+    }
+
+    const matchedQuantity = Math.min(
+        buyQuantity,
+        buyAvailable,
+        sellAvailable
+    );
+
+    return {
+        buyQuantity: matchedQuantity,
+        sellQuantity: matchedQuantity,
+        isQueueLimited: matchedQuantity < buyQuantity
+    };
+}
+
 async function sendOptionBuyOrder() {
 
     await refreshOptionStrategies();
@@ -1742,8 +1830,10 @@ async function sendOptionBuyOrder() {
                 return;
             }
 
-            const askA = getAskA();
-            const bidB = getBidB();
+            const quoteA = brokerAdapter.getOptionQuote(instrumentIdA);
+            const quoteB = brokerAdapter.getOptionQuote(instrumentIdB);
+            const askA = quoteA?.ask;
+            const bidB = quoteB?.bid;
 
             if (!askA) {
                 status.innerText = "قیمت سرخط فروش نماد A پیدا نشد.";
@@ -1768,10 +1858,25 @@ async function sendOptionBuyOrder() {
                 return;
             }
 
+            const queueOrderQuantities = getQueueOrderQuantities({
+                buyQuantity: buyQuantityA,
+                sellQuantity: sellQuantityB,
+                availableBuyQuantity: quoteA?.askQuantity,
+                availableSellQuantity: quoteB?.bidQuantity
+            });
+            const buyQuantityForStep = queueOrderQuantities.buyQuantity;
+            const sellQuantityForStepBase = queueOrderQuantities.sellQuantity;
+
+            if (buyQuantityForStep === 0 && sellQuantityForStepBase === 0) {
+                status.innerText =
+                    "حجم سرخط خرید یا فروش برای اجرای این زوج کافی نیست.";
+                return;
+            }
+
             let result = null;
             let buyPositionBefore = null;
 
-            if (buyQuantityA > 0) {
+            if (buyQuantityForStep > 0) {
                 if (isOptionBuyPositionVerificationEnabled()) {
                     progress.innerText = "در حال دریافت موقعیت خرید A...";
                     buyPositionBefore = await waitForOptionPositionQuantity(
@@ -1798,7 +1903,7 @@ async function sendOptionBuyOrder() {
                     instrumentId: instrumentIdA,
                     side: "Buy",
                     price: askA,
-                    quantity: buyQuantityA,
+                    quantity: buyQuantityForStep,
                     strategyKey: optionStrategyUniqueKey
                 });
 
@@ -1807,23 +1912,23 @@ async function sendOptionBuyOrder() {
 
             if (optionExecutionStopRequested) {
                 status.innerText =
-                    buyQuantityA > 0
+                    buyQuantityForStep > 0
                         ? "سفارش خرید ثبت شد؛ ادامه اجرا قبل از ارسال فروش متوقف شد."
                         : "ادامه اجرا قبل از ارسال فروش متوقف شد.";
                 return;
             }
 
             let buyExecuted = true;
-            let sellQuantityForStep = sellQuantityB;
+            let sellQuantityForStep = sellQuantityForStepBase;
             let partialBuyFilledQuantity = 0;
 
-            if (buyQuantityA > 0) {
+            if (buyQuantityForStep > 0) {
                 status.innerText = "در حال بررسی انجام شدن خرید نماد A...";
 
                 if (isOptionBuyPositionVerificationEnabled()) {
                     const verification = await verifyOptionBuyFromPositions({
                         instrumentId: instrumentIdA,
-                        quantity: buyQuantityA,
+                        quantity: buyQuantityForStep,
                         positionBefore: buyPositionBefore,
                         isStopRequested: () => optionExecutionStopRequested,
                         progress
@@ -1832,26 +1937,43 @@ async function sendOptionBuyOrder() {
                     buyExecuted = verification.executed;
 
                     if (!buyExecuted) {
-                        if (!verification.stopped && verification.filledQuantity > 0) {
-                            partialBuyFilledQuantity = verification.filledQuantity;
+                        let filledQuantityAfterCancellation =
+                            verification.filledQuantity;
+
+                        if (!verification.stopped) {
+                            const cancellationResult =
+                                await cancelTimedOutOptionOrder(result, progress);
+
+                            if (Number.isInteger(cancellationResult?.executedQuantity)) {
+                                filledQuantityAfterCancellation = Math.max(
+                                    filledQuantityAfterCancellation,
+                                    cancellationResult.executedQuantity
+                                );
+                            }
+                        }
+
+                        if (!verification.stopped && filledQuantityAfterCancellation >= buyQuantityForStep) {
+                            buyExecuted = true;
+                        } else if (!verification.stopped && filledQuantityAfterCancellation > 0) {
+                            partialBuyFilledQuantity = filledQuantityAfterCancellation;
                             sellQuantityForStep = Math.min(
-                                sellQuantityB,
+                                sellQuantityForStepBase,
                                 partialBuyFilledQuantity
                             );
                             buyExecuted = true;
                             status.innerText =
-                                `خرید A فقط ${partialBuyFilledQuantity} از ${buyQuantityA} انجام شد؛ فروش B به تعداد ${sellQuantityForStep} ارسال می‌شود.`;
+                                `خرید A فقط ${partialBuyFilledQuantity} از ${buyQuantityForStep} انجام شد؛ مانده سفارش لغو شد و فروش B به تعداد ${sellQuantityForStep} ارسال می‌شود.`;
                         } else {
                             status.innerText = verification.stopped
                                 ? "سفارش خرید A ثبت شد؛ ادامه اجرا هنگام بررسی موقعیت متوقف شد و فروش B ارسال نشد."
-                                : "افزایش موقعیت خرید A تأیید نشد؛ فروش B ارسال نشد.";
+                                : "افزایش موقعیت خرید A تأیید نشد؛ مانده سفارش لغو شد و فروش B ارسال نشد.";
                         }
                     }
                 } else {
                     buyExecuted = await isOptionBuyOrderExecuted({
                         instrumentId: instrumentIdA,
                         price: askA,
-                        quantity: buyQuantityA,
+                        quantity: buyQuantityForStep,
                         orderResponse: result
                     });
                 }
@@ -1867,7 +1989,7 @@ async function sendOptionBuyOrder() {
 
             if (optionExecutionStopRequested) {
                 status.innerText =
-                    buyQuantityA > 0
+                    buyQuantityForStep > 0
                         ? "سفارش خرید انجام شد؛ ادامه اجرا قبل از ارسال فروش متوقف شد."
                         : "ادامه اجرا قبل از ارسال فروش متوقف شد.";
                 return;
@@ -2085,8 +2207,10 @@ async function sendInitialOptionPositionOrder() {
                 return;
             }
 
-            const askA = getAskA();
-            const bidB = getBidB();
+            const quoteA = brokerAdapter.getOptionQuote(instrumentIdA);
+            const quoteB = brokerAdapter.getOptionQuote(instrumentIdB);
+            const askA = quoteA?.ask;
+            const bidB = quoteB?.bid;
 
             if (!askA) {
                 status.innerText = "قیمت سرخط فروش نماد A پیدا نشد.";
@@ -2108,10 +2232,25 @@ async function sendInitialOptionPositionOrder() {
                 return;
             }
 
+            const queueOrderQuantities = getQueueOrderQuantities({
+                buyQuantity: buyQuantityA,
+                sellQuantity: sellQuantityB,
+                availableBuyQuantity: quoteA?.askQuantity,
+                availableSellQuantity: quoteB?.bidQuantity
+            });
+            const buyQuantityForStep = queueOrderQuantities.buyQuantity;
+            const sellQuantityForStepBase = queueOrderQuantities.sellQuantity;
+
+            if (buyQuantityForStep === 0 && sellQuantityForStepBase === 0) {
+                status.innerText =
+                    "حجم سرخط خرید یا فروش برای اجرای موقعیت اول کافی نیست.";
+                return;
+            }
+
             let buyResult = null;
             let buyPositionBefore = null;
 
-            if (buyQuantityA > 0) {
+            if (buyQuantityForStep > 0) {
                 if (isOptionBuyPositionVerificationEnabled()) {
                     progress.innerText = "در حال دریافت موقعیت خرید A...";
                     buyPositionBefore = await waitForOptionPositionQuantity(
@@ -2138,7 +2277,7 @@ async function sendInitialOptionPositionOrder() {
                     instrumentId: instrumentIdA,
                     side: "Buy",
                     price: askA,
-                    quantity: buyQuantityA,
+                    quantity: buyQuantityForStep,
                     strategyKey: null
                 });
 
@@ -2147,23 +2286,23 @@ async function sendInitialOptionPositionOrder() {
 
             if (optionExecutionStopRequested) {
                 status.innerText =
-                    buyQuantityA > 0
+                    buyQuantityForStep > 0
                         ? "سفارش خرید اولیه ثبت شد؛ ادامه قبل از ساخت استراتژی متوقف شد."
                         : "ادامه قبل از ساخت استراتژی متوقف شد.";
                 return;
             }
 
             let buyExecuted = true;
-            let sellQuantityForStep = sellQuantityB;
+            let sellQuantityForStep = sellQuantityForStepBase;
             let partialBuyFilledQuantity = 0;
 
-            if (buyQuantityA > 0) {
+            if (buyQuantityForStep > 0) {
                 status.innerText = "در حال بررسی انجام شدن خرید اولیه...";
 
                 if (isOptionBuyPositionVerificationEnabled()) {
                     const verification = await verifyOptionBuyFromPositions({
                         instrumentId: instrumentIdA,
-                        quantity: buyQuantityA,
+                        quantity: buyQuantityForStep,
                         positionBefore: buyPositionBefore,
                         isStopRequested: () => optionExecutionStopRequested,
                         progress
@@ -2172,26 +2311,43 @@ async function sendInitialOptionPositionOrder() {
                     buyExecuted = verification.executed;
 
                     if (!buyExecuted) {
-                        if (!verification.stopped && verification.filledQuantity > 0) {
-                            partialBuyFilledQuantity = verification.filledQuantity;
+                        let filledQuantityAfterCancellation =
+                            verification.filledQuantity;
+
+                        if (!verification.stopped) {
+                            const cancellationResult =
+                                await cancelTimedOutOptionOrder(buyResult, progress);
+
+                            if (Number.isInteger(cancellationResult?.executedQuantity)) {
+                                filledQuantityAfterCancellation = Math.max(
+                                    filledQuantityAfterCancellation,
+                                    cancellationResult.executedQuantity
+                                );
+                            }
+                        }
+
+                        if (!verification.stopped && filledQuantityAfterCancellation >= buyQuantityForStep) {
+                            buyExecuted = true;
+                        } else if (!verification.stopped && filledQuantityAfterCancellation > 0) {
+                            partialBuyFilledQuantity = filledQuantityAfterCancellation;
                             sellQuantityForStep = Math.min(
-                                sellQuantityB,
+                                sellQuantityForStepBase,
                                 partialBuyFilledQuantity
                             );
                             buyExecuted = true;
                             status.innerText =
-                                `خرید اولیه فقط ${partialBuyFilledQuantity} از ${buyQuantityA} انجام شد؛ فروش B به تعداد ${sellQuantityForStep} ارسال می‌شود.`;
+                                `خرید اولیه فقط ${partialBuyFilledQuantity} از ${buyQuantityForStep} انجام شد؛ مانده سفارش لغو شد و فروش B به تعداد ${sellQuantityForStep} ارسال می‌شود.`;
                         } else {
                             status.innerText = verification.stopped
                                 ? "سفارش خرید اولیه ثبت شد؛ ادامه هنگام بررسی موقعیت متوقف شد و فروش انجام نشد."
-                                : "افزایش موقعیت خرید A تأیید نشد؛ فروش انجام نشد.";
+                                : "افزایش موقعیت خرید A تأیید نشد؛ مانده سفارش لغو شد و فروش انجام نشد.";
                         }
                     }
                 } else {
                     buyExecuted = await isOptionBuyOrderExecuted({
                         instrumentId: instrumentIdA,
                         price: askA,
-                        quantity: buyQuantityA,
+                        quantity: buyQuantityForStep,
                         orderResponse: buyResult
                     });
                 }
@@ -2211,7 +2367,7 @@ async function sendInitialOptionPositionOrder() {
             const strategyKey = await createInitialOptionStrategy({
                 instrumentIdA,
                 instrumentIdB,
-                quantity: partialBuyFilledQuantity || buyQuantityA || sellQuantityB,
+                quantity: partialBuyFilledQuantity || buyQuantityForStep || sellQuantityForStepBase,
                 buyOrderResponse: buyResult
             });
 
@@ -2363,8 +2519,10 @@ async function sendOptionOffsetOrder() {
                 return;
             }
 
-            const askB = getAskB();
-            const bidA = getBidA();
+            const quoteB = brokerAdapter.getOptionQuote(instrumentIdB);
+            const quoteA = brokerAdapter.getOptionQuote(instrumentIdA);
+            const askB = quoteB?.ask;
+            const bidA = quoteA?.bid;
 
             if (!askB) {
                 status.innerText = "قیمت سرخط فروش نماد B پیدا نشد.";
@@ -2389,10 +2547,25 @@ async function sendOptionOffsetOrder() {
                 return;
             }
 
+            const queueOrderQuantities = getQueueOrderQuantities({
+                buyQuantity: buyQuantityB,
+                sellQuantity: sellQuantityA,
+                availableBuyQuantity: quoteB?.askQuantity,
+                availableSellQuantity: quoteA?.bidQuantity
+            });
+            const buyQuantityForStep = queueOrderQuantities.buyQuantity;
+            const sellQuantityForStepBase = queueOrderQuantities.sellQuantity;
+
+            if (buyQuantityForStep === 0 && sellQuantityForStepBase === 0) {
+                status.innerText =
+                    "حجم سرخط خرید یا فروش برای اجرای آفست کافی نیست.";
+                return;
+            }
+
             let buyResult = null;
             let buyPositionBefore = null;
 
-            if (buyQuantityB > 0) {
+            if (buyQuantityForStep > 0) {
                 if (isOptionBuyPositionVerificationEnabled()) {
                     progress.innerText = "در حال دریافت موقعیت فروش B...";
                     buyPositionBefore = await waitForOptionPositionQuantity(
@@ -2419,7 +2592,7 @@ async function sendOptionOffsetOrder() {
                     instrumentId: instrumentIdB,
                     side: "Buy",
                     price: askB,
-                    quantity: buyQuantityB,
+                    quantity: buyQuantityForStep,
                     strategyKey: optionStrategyUniqueKey
                 });
 
@@ -2428,23 +2601,23 @@ async function sendOptionOffsetOrder() {
 
             if (optionOffsetExecutionStopRequested) {
                 status.innerText =
-                    buyQuantityB > 0
+                    buyQuantityForStep > 0
                         ? "سفارش خرید B ثبت شد؛ ادامه آفست قبل از ارسال فروش A متوقف شد."
                         : "ادامه آفست قبل از ارسال فروش A متوقف شد.";
                 return;
             }
 
             let buyExecuted = true;
-            let sellQuantityForStep = sellQuantityA;
+            let sellQuantityForStep = sellQuantityForStepBase;
             let partialBuyFilledQuantity = 0;
 
-            if (buyQuantityB > 0) {
+            if (buyQuantityForStep > 0) {
                 status.innerText = "در حال بررسی انجام شدن خرید نماد B...";
 
                 if (isOptionBuyPositionVerificationEnabled()) {
                     const verification = await verifyOptionBuyFromPositions({
                         instrumentId: instrumentIdB,
-                        quantity: buyQuantityB,
+                        quantity: buyQuantityForStep,
                         positionBefore: buyPositionBefore,
                         positionLabel: OPTION_SELL_POSITION_LABEL,
                         expectedDirection: "decrease",
@@ -2455,26 +2628,43 @@ async function sendOptionOffsetOrder() {
                     buyExecuted = verification.executed;
 
                     if (!buyExecuted) {
-                        if (!verification.stopped && verification.filledQuantity > 0) {
-                            partialBuyFilledQuantity = verification.filledQuantity;
+                        let filledQuantityAfterCancellation =
+                            verification.filledQuantity;
+
+                        if (!verification.stopped) {
+                            const cancellationResult =
+                                await cancelTimedOutOptionOrder(buyResult, progress);
+
+                            if (Number.isInteger(cancellationResult?.executedQuantity)) {
+                                filledQuantityAfterCancellation = Math.max(
+                                    filledQuantityAfterCancellation,
+                                    cancellationResult.executedQuantity
+                                );
+                            }
+                        }
+
+                        if (!verification.stopped && filledQuantityAfterCancellation >= buyQuantityForStep) {
+                            buyExecuted = true;
+                        } else if (!verification.stopped && filledQuantityAfterCancellation > 0) {
+                            partialBuyFilledQuantity = filledQuantityAfterCancellation;
                             sellQuantityForStep = Math.min(
-                                sellQuantityA,
+                                sellQuantityForStepBase,
                                 partialBuyFilledQuantity
                             );
                             buyExecuted = true;
                             status.innerText =
-                                `خرید B فقط ${partialBuyFilledQuantity} از ${buyQuantityB} انجام شد؛ فروش A به تعداد ${sellQuantityForStep} ارسال می‌شود.`;
+                                `خرید B فقط ${partialBuyFilledQuantity} از ${buyQuantityForStep} انجام شد؛ مانده سفارش لغو شد و فروش A به تعداد ${sellQuantityForStep} ارسال می‌شود.`;
                         } else {
                             status.innerText = verification.stopped
                                 ? "سفارش خرید B ثبت شد؛ ادامه آفست هنگام بررسی موقعیت متوقف شد و فروش A ارسال نشد."
-                                : "کاهش موقعیت فروش B تأیید نشد؛ فروش A ارسال نشد.";
+                                : "کاهش موقعیت فروش B تأیید نشد؛ مانده سفارش لغو شد و فروش A ارسال نشد.";
                         }
                     }
                 } else {
                     buyExecuted = await isOptionBuyOrderExecuted({
                         instrumentId: instrumentIdB,
                         price: askB,
-                        quantity: buyQuantityB,
+                        quantity: buyQuantityForStep,
                         orderResponse: buyResult
                     });
                 }
@@ -2490,7 +2680,7 @@ async function sendOptionOffsetOrder() {
 
             if (optionOffsetExecutionStopRequested) {
                 status.innerText =
-                    buyQuantityB > 0
+                    buyQuantityForStep > 0
                         ? "سفارش خرید B انجام شد؛ ادامه آفست قبل از ارسال فروش A متوقف شد."
                         : "ادامه آفست قبل از ارسال فروش A متوقف شد.";
                 return;
@@ -3112,8 +3302,8 @@ function createPairState(source = {}) {
 
 function savePairs() { localStorage.setItem(PAIRS_STORAGE_KEY, JSON.stringify(pairStates.map(pair => ({ id: pair.id, symbolA: pair.symbolA, symbolB: pair.symbolB, strategyKey: pair.strategyKey, quantities: pair.quantities, values: pair.values, executionCount: pair.executionCount, offsetExecutionCount: pair.offsetExecutionCount })))); }
 function loadPairs() { try { const saved = JSON.parse(localStorage.getItem(PAIRS_STORAGE_KEY) || "null"); pairStates = Array.isArray(saved) && saved.length ? saved.map(createPairState) : [createPairState()]; } catch (_) { pairStates = [createPairState()]; } }
-function saveGlobalSettings() { const ids = ["opt-auto-values", "opt-auto-buy-buttons", "opt-sync-order-quantities", "opt-verify-buy-position", "opt-alarm-enabled"]; const values = Object.fromEntries(ids.map(id => [id, byId(id)?.checked])); ["opt-alarm-count", "opt-alarm-interval"].forEach(id => values[id] = byId(id)?.value); values["opt-settings-open"] = !byId("opt-settings-body")?.hidden; localStorage.setItem(GLOBAL_STORAGE_KEY, JSON.stringify(values)); }
-function loadGlobalSettings() { let values = {}; try { values = JSON.parse(localStorage.getItem(GLOBAL_STORAGE_KEY) || "{}"); } catch (_) {} ["opt-auto-values", "opt-auto-buy-buttons", "opt-sync-order-quantities", "opt-verify-buy-position", "opt-alarm-enabled"].forEach(id => { if (typeof values[id] === "boolean") byId(id).checked = values[id]; }); ["opt-alarm-count", "opt-alarm-interval"].forEach(id => { if (values[id] !== undefined) byId(id).value = values[id]; }); if (values["opt-settings-open"]) { byId("opt-settings-body").hidden = false; byId("opt-settings-toggle").innerText = "-"; } }
+function saveGlobalSettings() { const ids = ["opt-auto-values", "opt-auto-buy-buttons", "opt-sync-order-quantities", "opt-limit-order-quantity-to-queue", "opt-verify-buy-position", "opt-alarm-enabled"]; const values = Object.fromEntries(ids.map(id => [id, byId(id)?.checked])); ["opt-alarm-count", "opt-alarm-interval"].forEach(id => values[id] = byId(id)?.value); values["opt-settings-open"] = !byId("opt-settings-body")?.hidden; localStorage.setItem(GLOBAL_STORAGE_KEY, JSON.stringify(values)); }
+function loadGlobalSettings() { let values = {}; try { values = JSON.parse(localStorage.getItem(GLOBAL_STORAGE_KEY) || "{}"); } catch (_) {} ["opt-auto-values", "opt-auto-buy-buttons", "opt-sync-order-quantities", "opt-limit-order-quantity-to-queue", "opt-verify-buy-position", "opt-alarm-enabled"].forEach(id => { if (typeof values[id] === "boolean") byId(id).checked = values[id]; }); ["opt-alarm-count", "opt-alarm-interval"].forEach(id => { if (values[id] !== undefined) byId(id).value = values[id]; }); if (values["opt-settings-open"]) { byId("opt-settings-body").hidden = false; byId("opt-settings-toggle").innerText = "-"; } }
 function getPairCard(pair) { return root.querySelector(`[data-pair-id="${CSS.escape(pair.id)}"]`); }
 function pairElement(pair, id) { return getPairCard(pair)?.querySelector(`#${id}`); }
 async function withPair(pair, task) {
@@ -3321,7 +3511,7 @@ function showOptionError(error) { byId("option-symbols-status").innerText = erro
 byId("opt-add-pair").onclick = addPair;
 byId("opt-refresh-pairs").onclick = () => refreshAllPairs().catch(showOptionError);
 byId("opt-settings-toggle").onclick = () => { const body = byId("opt-settings-body"); body.hidden = !body.hidden; byId("opt-settings-toggle").innerText = body.hidden ? "+" : "-"; saveGlobalSettings(); };
-["opt-auto-values", "opt-auto-buy-buttons", "opt-sync-order-quantities", "opt-verify-buy-position", "opt-alarm-enabled", "opt-alarm-count", "opt-alarm-interval"].forEach(id => byId(id).addEventListener("change", () => {
+["opt-auto-values", "opt-auto-buy-buttons", "opt-sync-order-quantities", "opt-limit-order-quantity-to-queue", "opt-verify-buy-position", "opt-alarm-enabled", "opt-alarm-count", "opt-alarm-interval"].forEach(id => byId(id).addEventListener("change", () => {
     saveGlobalSettings();
     if (id === "opt-alarm-enabled") syncOptionAlarmControlsVisibility();
     if (id === "opt-sync-order-quantities") syncAllPairQuantities();

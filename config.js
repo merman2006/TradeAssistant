@@ -9,6 +9,7 @@
             endpoints: {
                 searchInstruments: "/api/PublicMessages/SearchInstruments",
                 orderEntry: "/api/Orders/OrderEntry",
+                orderCancellation: "/api/Orders/OrderCancellation",
                 optionStrategies: "/api/OptionStrategies/Get",
                 optionStrategyCreate: "/api/OptionStrategies/Create"
             }
@@ -21,6 +22,7 @@
             endpoints: {
                 searchInstruments: "/api/PublicMessages/SearchInstruments",
                 orderEntry: "/api/Orders/OrderEntry",
+                orderCancellation: "/api/Orders/OrderCancellation",
                 optionStrategies: "/api/OptionStrategies/Get",
                 optionStrategyCreate: "/api/OptionStrategies/Create"
             }
@@ -33,6 +35,7 @@
             endpoints: {
                 searchInstruments: "/api/PublicMessages/SearchInstruments",
                 orderEntry: "/api/Orders/OrderEntry",
+                orderCancellation: "/api/Orders/OrderCancellation",
                 optionStrategies: "/api/OptionStrategies/Get",
                 optionStrategyCreate: "/api/OptionStrategies/Create"
             }

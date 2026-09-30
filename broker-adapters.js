@@ -281,6 +281,28 @@
             };
         }
 
+        function getOrderResponseData(orderResponse) {
+            return (
+                orderResponse?.response?.data ||
+                orderResponse?.response?.Data ||
+                orderResponse?.data ||
+                orderResponse?.Data ||
+                null
+            );
+        }
+
+        function getOrderCancellationIds(orderResponse) {
+            const data = getOrderResponseData(orderResponse);
+
+            const orderId = data?.orderId ?? data?.OrderId;
+            const id = data?.id ?? data?.Id;
+
+            return orderId !== null && orderId !== undefined &&
+                id !== null && id !== undefined
+                ? { orderId, id }
+                : null;
+        }
+
         return {
             name: config.name,
             type: config.type,
@@ -402,6 +424,57 @@
                 };
             },
 
+            async cancelOptionOrder(orderResponse) {
+                const identifiers = getOrderCancellationIds(orderResponse);
+
+                if (!identifiers) {
+                    throw new Error(
+                        "شناسه‌های سفارش ثبت‌شده برای لغو قابل خواندن نیست."
+                    );
+                }
+
+                const parameters = new URLSearchParams({
+                    orderId: String(identifiers.orderId),
+                    Id: String(identifiers.id)
+                });
+                const { response, json } = await fetchJson(
+                    `${config.endpoints.orderCancellation}?${parameters}`,
+                    {
+                        method: "POST",
+                        credentials: "include",
+                        headers: {
+                            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+                            "authorization": getAuth()
+                        },
+                        body: parameters.toString()
+                    }
+                );
+
+                if (json?.response?.successful === false) {
+                    throw new Error(
+                        getResponseErrorMessage(
+                            json,
+                            "لغو مانده سفارش ناموفق بود."
+                        )
+                    );
+                }
+
+                const cancellationData = getOrderResponseData(json);
+                const executedQuantity =
+                    cancellationData?.executedQuantity ??
+                    cancellationData?.ExecutedQuantity;
+
+                return {
+                    response,
+                    json,
+                    executedQuantity:
+                        executedQuantity === null ||
+                        executedQuantity === undefined
+                            ? null
+                            : normalizeNumber(executedQuantity)
+                };
+            },
+
             async createOptionStrategy({
                 instrumentIdA,
                 instrumentIdB,
@@ -503,10 +576,22 @@
                 const ask = container?.querySelector(
                     'client-instrument-price-position-row[orderside="Sell"] .-is-price .-is-clickable'
                 );
+                const bidQuantity = container?.querySelector(
+                    'client-instrument-price-position-row[orderside="Buy"] .-is-quantity .-is-clickable'
+                );
+                const askQuantity = container?.querySelector(
+                    'client-instrument-price-position-row[orderside="Sell"] .-is-quantity .-is-clickable'
+                );
 
                 return {
                     bid: normalizeNumber(bid?.innerText),
-                    ask: normalizeNumber(ask?.innerText)
+                    ask: normalizeNumber(ask?.innerText),
+                    bidQuantity: bidQuantity
+                        ? normalizeNumber(bidQuantity.innerText)
+                        : null,
+                    askQuantity: askQuantity
+                        ? normalizeNumber(askQuantity.innerText)
+                        : null
                 };
             },
 

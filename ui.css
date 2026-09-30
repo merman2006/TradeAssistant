@@ -34,8 +34,9 @@
     background: #1e293b;
     color: white;
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: center;
+    gap: 4px;
     padding: 0 8px;
     cursor: move;
 }
@@ -1133,6 +1134,28 @@
     font-weight: bold;
 }
 
+/* Keep the alarm toggle and both settings compactly on one line. */
+.option-global-settings .option-settings-body .option-alarm-row {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 6px;
+}
+
+.option-global-settings .option-settings-body .option-alarm-field {
+    flex: 0 0 auto;
+}
+
+.option-global-settings .option-settings-body .option-alarm-interval-field input {
+    width: 50px;
+}
+
+.option-global-settings .option-settings-body #opt-alarm-interval {
+    width: 50px;
+    min-width: 50px;
+}
+
 @media (max-width: 1000px) {
     .ppt-content#ppt-option {
         display: block;
@@ -1981,6 +2004,15 @@
     width: max-content;
     min-width: 130px;
     max-width: calc(100vw - 24px);
+}
+
+/* Keep the header's top-right edge fixed while the panel changes height. */
+#ppt-panel {
+    top: 12px;
+    right: 12px;
+    bottom: auto;
+    left: auto;
+    transform-origin: top right;
 }
 
 /*
