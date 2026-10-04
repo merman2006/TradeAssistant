@@ -3295,12 +3295,32 @@ function createPairState(source = {}) {
         values: { maxValue: source.values?.maxValue ?? "", premium: source.values?.premium ?? "", expectedReturn: source.values?.expectedReturn ?? "", expectedOffsetReturn: source.values?.expectedOffsetReturn ?? "" },
         executionCount: source.executionCount || 1,
         offsetExecutionCount: source.offsetExecutionCount || 1,
+        auto: {
+            open: {
+                maxBuy: source.auto?.open?.maxBuy ?? 0,
+                maxDifference: source.auto?.open?.maxDifference ?? 0,
+                intervalMs: source.auto?.open?.intervalMs ?? 1000,
+                enabled: false,
+                executing: false,
+                nextAllowedAt: 0,
+                blockedReason: ""
+            },
+            offset: {
+                minBuy: source.auto?.offset?.minBuy ?? 0,
+                maxDifference: source.auto?.offset?.maxDifference ?? 0,
+                intervalMs: source.auto?.offset?.intervalMs ?? 1000,
+                enabled: false,
+                executing: false,
+                nextAllowedAt: 0,
+                blockedReason: ""
+            }
+        },
         alarm: { buy: { isHit: false, signature: null }, offset: { isHit: false, signature: null } },
         openStopRequested: false, offsetStopRequested: false
     };
 }
 
-function savePairs() { localStorage.setItem(PAIRS_STORAGE_KEY, JSON.stringify(pairStates.map(pair => ({ id: pair.id, symbolA: pair.symbolA, symbolB: pair.symbolB, strategyKey: pair.strategyKey, quantities: pair.quantities, values: pair.values, executionCount: pair.executionCount, offsetExecutionCount: pair.offsetExecutionCount })))); }
+function savePairs() { localStorage.setItem(PAIRS_STORAGE_KEY, JSON.stringify(pairStates.map(pair => ({ id: pair.id, symbolA: pair.symbolA, symbolB: pair.symbolB, strategyKey: pair.strategyKey, quantities: pair.quantities, values: pair.values, executionCount: pair.executionCount, offsetExecutionCount: pair.offsetExecutionCount, auto: { open: { maxBuy: pair.auto.open.maxBuy, maxDifference: pair.auto.open.maxDifference, intervalMs: pair.auto.open.intervalMs }, offset: { minBuy: pair.auto.offset.minBuy, maxDifference: pair.auto.offset.maxDifference, intervalMs: pair.auto.offset.intervalMs } } })))); }
 function loadPairs() { try { const saved = JSON.parse(localStorage.getItem(PAIRS_STORAGE_KEY) || "null"); pairStates = Array.isArray(saved) && saved.length ? saved.map(createPairState) : [createPairState()]; } catch (_) { pairStates = [createPairState()]; } }
 function saveGlobalSettings() { const ids = ["opt-auto-values", "opt-auto-buy-buttons", "opt-sync-order-quantities", "opt-limit-order-quantity-to-queue", "opt-verify-buy-position", "opt-alarm-enabled"]; const values = Object.fromEntries(ids.map(id => [id, byId(id)?.checked])); ["opt-alarm-count", "opt-alarm-interval"].forEach(id => values[id] = byId(id)?.value); values["opt-settings-open"] = !byId("opt-settings-body")?.hidden; localStorage.setItem(GLOBAL_STORAGE_KEY, JSON.stringify(values)); }
 function loadGlobalSettings() { let values = {}; try { values = JSON.parse(localStorage.getItem(GLOBAL_STORAGE_KEY) || "{}"); } catch (_) {} ["opt-auto-values", "opt-auto-buy-buttons", "opt-sync-order-quantities", "opt-limit-order-quantity-to-queue", "opt-verify-buy-position", "opt-alarm-enabled"].forEach(id => { if (typeof values[id] === "boolean") byId(id).checked = values[id]; }); ["opt-alarm-count", "opt-alarm-interval"].forEach(id => { if (values[id] !== undefined) byId(id).value = values[id]; }); if (values["opt-settings-open"]) { byId("opt-settings-body").hidden = false; byId("opt-settings-toggle").innerText = "-"; } }
@@ -3325,6 +3345,12 @@ function renderPair(pair) {
     card.querySelector("#opt-buy-quantity").value = pair.quantities.openBuyA; card.querySelector("#opt-buy-sell-quantity").value = pair.quantities.openSellB;
     card.querySelector("#opt-offset-buy-quantity").value = pair.quantities.offsetBuyB; card.querySelector("#opt-sell-quantity").value = pair.quantities.offsetSellA; card.querySelector("#opt-buy-execution-count").value = pair.executionCount; card.querySelector("#opt-sell-execution-count").value = pair.offsetExecutionCount;
     card.querySelector("#opt-max-value").value = pair.values.maxValue; card.querySelector("#opt-premium").value = pair.values.premium; card.querySelector("#opt-expected-return").value = pair.values.expectedReturn; card.querySelector("#opt-expected-offset-return").value = pair.values.expectedOffsetReturn;
+    card.querySelector("#opt-auto-open-max-buy").value = pair.auto.open.maxBuy;
+    card.querySelector("#opt-auto-open-max-difference").value = pair.auto.open.maxDifference;
+    card.querySelector("#opt-auto-open-interval").value = pair.auto.open.intervalMs;
+    card.querySelector("#opt-auto-offset-min-buy").value = pair.auto.offset.minBuy;
+    card.querySelector("#opt-auto-offset-max-difference").value = pair.auto.offset.maxDifference;
+    card.querySelector("#opt-auto-offset-interval").value = pair.auto.offset.intervalMs;
     return card;
 }
 function renderAllPairs() { const container = byId("opt-pairs"); container.innerHTML = ""; pairStates.forEach(pair => container.appendChild(renderPair(pair))); bindPairEvents(); bindPairQuantitySync(); }
@@ -3377,7 +3403,7 @@ async function refreshAllPairs() {
         syncInitialPositionButtonVisibility();
     })));
 }
-function syncPairFromDom(pair) { pair.symbolA = pairElement(pair, "opt-symbol-a")?.value || ""; pair.symbolB = pairElement(pair, "opt-symbol-b")?.value || ""; pair.strategyKey = getSelectedOptionStrategyKey() || pair.strategyKey; pair.quantities.openBuyA = Number(pairElement(pair, "opt-buy-quantity")?.value || 0); pair.quantities.openSellB = Number(pairElement(pair, "opt-buy-sell-quantity")?.value || 0); pair.quantities.offsetBuyB = Number(pairElement(pair, "opt-offset-buy-quantity")?.value || 0); pair.quantities.offsetSellA = Number(pairElement(pair, "opt-sell-quantity")?.value || 0); pair.executionCount = Number(pairElement(pair, "opt-buy-execution-count")?.value || 1); pair.offsetExecutionCount = Number(pairElement(pair, "opt-sell-execution-count")?.value || 1); pair.values.maxValue = pairElement(pair, "opt-max-value")?.value || ""; pair.values.premium = pairElement(pair, "opt-premium")?.value || ""; pair.values.expectedReturn = pairElement(pair, "opt-expected-return")?.value || ""; pair.values.expectedOffsetReturn = pairElement(pair, "opt-expected-offset-return")?.value || ""; savePairs(); }
+function syncPairFromDom(pair) { pair.symbolA = pairElement(pair, "opt-symbol-a")?.value || ""; pair.symbolB = pairElement(pair, "opt-symbol-b")?.value || ""; pair.strategyKey = getSelectedOptionStrategyKey() || pair.strategyKey; pair.quantities.openBuyA = Number(pairElement(pair, "opt-buy-quantity")?.value || 0); pair.quantities.openSellB = Number(pairElement(pair, "opt-buy-sell-quantity")?.value || 0); pair.quantities.offsetBuyB = Number(pairElement(pair, "opt-offset-buy-quantity")?.value || 0); pair.quantities.offsetSellA = Number(pairElement(pair, "opt-sell-quantity")?.value || 0); pair.executionCount = Number(pairElement(pair, "opt-buy-execution-count")?.value || 1); pair.offsetExecutionCount = Number(pairElement(pair, "opt-sell-execution-count")?.value || 1); pair.values.maxValue = pairElement(pair, "opt-max-value")?.value || ""; pair.values.premium = pairElement(pair, "opt-premium")?.value || ""; pair.values.expectedReturn = pairElement(pair, "opt-expected-return")?.value || ""; pair.values.expectedOffsetReturn = pairElement(pair, "opt-expected-offset-return")?.value || ""; pair.auto.open.maxBuy = Number(pairElement(pair, "opt-auto-open-max-buy")?.value || 0); pair.auto.open.maxDifference = Number(pairElement(pair, "opt-auto-open-max-difference")?.value || 0); pair.auto.open.intervalMs = Number(pairElement(pair, "opt-auto-open-interval")?.value || 0); pair.auto.offset.minBuy = Number(pairElement(pair, "opt-auto-offset-min-buy")?.value || 0); pair.auto.offset.maxDifference = Number(pairElement(pair, "opt-auto-offset-max-difference")?.value || 0); pair.auto.offset.intervalMs = Number(pairElement(pair, "opt-auto-offset-interval")?.value || 0); savePairs(); }
 
 function getMonitorQuote(preferred, fallback) {
     const preferredNumber = Number(preferred);
@@ -3394,10 +3420,280 @@ function getMonitorQuote(preferred, fallback) {
     return { value: null, isFallback: false };
 }
 
+function getPairAutoDirectionState(pair, direction) {
+    return pair.auto[direction];
+}
+
+function getPairAutoControlId(direction, name) {
+    return `opt-auto-${direction}-${name}`;
+}
+
+function setPairAutoStatus(pair, direction, text, isRunning = false) {
+    const status = pairElement(
+        pair,
+        getPairAutoControlId(direction, "status")
+    );
+
+    if (!status)
+        return;
+
+    status.innerText = text;
+    status.title = text;
+    status.classList.toggle("running", isRunning);
+    status.classList.toggle(
+        "blocked",
+        !isRunning && text !== "فعال" && text !== "متوقف شد"
+    );
+}
+
+function syncPairAutoControls(pair, direction) {
+    const state = getPairAutoDirectionState(pair, direction);
+    const start = pairElement(pair, getPairAutoControlId(direction, "start"));
+    const stop = pairElement(pair, getPairAutoControlId(direction, "stop"));
+    const toggle = getPairCard(pair)?.querySelector(
+        `[data-action="toggle-auto-${direction}"]`
+    );
+
+    if (start)
+        start.disabled = state.enabled;
+
+    if (stop)
+        stop.disabled = !state.enabled;
+
+    toggle?.classList.toggle("auto-active", state.enabled);
+
+    if (state.executing) {
+        setPairAutoStatus(pair, direction, "در حال اجرا...", true);
+    } else if (state.enabled) {
+        setPairAutoStatus(
+            pair,
+            direction,
+            state.blockedReason || "فعال",
+            !state.blockedReason
+        );
+    }
+}
+
+function setPairAutoBlocked(pair, direction, reason) {
+    const state = getPairAutoDirectionState(pair, direction);
+    state.blockedReason = reason;
+    setPairAutoStatus(pair, direction, reason);
+}
+
+function togglePairAutoControls(pair, direction) {
+    const controls = getPairCard(pair)?.querySelector(
+        `[data-auto-controls="${direction}"]`
+    );
+    const section = controls?.closest(".pair-monitor-section");
+
+    if (!controls || !section)
+        return;
+
+    controls.hidden = !controls.hidden;
+    section.classList.toggle("auto-controls-open", !controls.hidden);
+}
+
+async function readPairAutoPositions(pair) {
+    const [buyPositionA, sellPositionB] = await Promise.all([
+        waitForOptionPositionQuantity(
+            pair.symbolA,
+            OPTION_BUY_POSITION_LABEL
+        ),
+        waitForOptionPositionQuantity(
+            pair.symbolB,
+            OPTION_SELL_POSITION_LABEL
+        )
+    ]);
+
+    return { buyPositionA, sellPositionB };
+}
+
+function isNonNegativeInteger(value) {
+    return Number.isInteger(value) && value >= 0;
+}
+
+async function canRunPairAutoOrder(pair, direction, showCheckingStatus = true) {
+    const state = getPairAutoDirectionState(pair, direction);
+
+    if (!pair.symbolA || !pair.symbolB) {
+        setPairAutoBlocked(pair, direction, "نمادها ناقص‌اند");
+        return false;
+    }
+
+    if (!isOptionBuyPositionVerificationEnabled()) {
+        setPairAutoBlocked(pair, direction, "تأیید موقعیت غیرفعال است");
+        return false;
+    }
+
+    if (
+        !isNonNegativeInteger(state.maxDifference) ||
+        !isNonNegativeInteger(state.intervalMs) ||
+        (direction === "open" && (!isNonNegativeInteger(state.maxBuy) || state.maxBuy <= 0)) ||
+        (direction === "offset" && !isNonNegativeInteger(state.minBuy))
+    ) {
+        setPairAutoBlocked(pair, direction, "اعداد تنظیمات نامعتبرند");
+        return false;
+    }
+
+    if (showCheckingStatus) {
+        setPairAutoStatus(pair, direction, "در حال بررسی موقعیت...", true);
+    }
+    const { buyPositionA, sellPositionB } = await readPairAutoPositions(pair);
+
+    if (buyPositionA === null || sellPositionB === null) {
+        setPairAutoBlocked(pair, direction, "موقعیت‌ها خوانده نشدند");
+        return false;
+    }
+
+    if (direction === "open" && buyPositionA >= state.maxBuy) {
+        setPairAutoBlocked(pair, direction, "سقف خرید رسیده؛ بازکردن انجام نشد.");
+        return false;
+    }
+
+    const currentDifference = Math.abs(buyPositionA - sellPositionB);
+
+    if (currentDifference > state.maxDifference) {
+        setPairAutoBlocked(
+            pair,
+            direction,
+            `اختلاف زیاد است؛ ${direction === "open" ? "بازکردن" : "آفست"} انجام نشد.`
+        );
+        return false;
+    }
+
+    const buyQuantity = direction === "open"
+        ? pair.quantities.openBuyA
+        : pair.quantities.offsetBuyB;
+    const sellQuantity = direction === "open"
+        ? pair.quantities.openSellB
+        : pair.quantities.offsetSellA;
+
+    if (!isNonNegativeInteger(buyQuantity) || !isNonNegativeInteger(sellQuantity)) {
+        setPairAutoBlocked(pair, direction, "تعداد سفارش نامعتبر است");
+        return false;
+    }
+
+    const projectedBuyPositionA = direction === "open"
+        ? buyPositionA + buyQuantity
+        : buyPositionA - sellQuantity;
+    const projectedSellPositionB = direction === "open"
+        ? sellPositionB + sellQuantity
+        : sellPositionB - buyQuantity;
+
+    if (projectedBuyPositionA < 0 || projectedSellPositionB < 0) {
+        setPairAutoBlocked(pair, direction, "موقعیت کافی نیست");
+        return false;
+    }
+
+    if (direction === "open" && projectedBuyPositionA > state.maxBuy) {
+        setPairAutoBlocked(pair, direction, "اجرای بعدی از سقف خرید عبور می‌کند.");
+        return false;
+    }
+
+    if (direction === "offset" && projectedBuyPositionA < state.minBuy) {
+        setPairAutoBlocked(pair, direction, "حداقل خرید حفظ نمی‌شود؛ آفست انجام نشد.");
+        return false;
+    }
+
+    if (
+        Math.abs(projectedBuyPositionA - projectedSellPositionB) >
+        state.maxDifference
+    ) {
+        setPairAutoBlocked(
+            pair,
+            direction,
+            `اختلاف بعد از سفارش زیاد می‌شود؛ ${direction === "open" ? "بازکردن" : "آفست"} انجام نشد.`
+        );
+        return false;
+    }
+
+    state.blockedReason = "";
+    return true;
+}
+
+function startPairAuto(pair, direction) {
+    withPair(pair, async () => {
+        syncPairFromDom(pair);
+        const state = getPairAutoDirectionState(pair, direction);
+
+        if (
+            !isNonNegativeInteger(state.maxDifference) ||
+            !isNonNegativeInteger(state.intervalMs) ||
+            (direction === "open" && (!isNonNegativeInteger(state.maxBuy) || state.maxBuy <= 0)) ||
+            (direction === "offset" && !isNonNegativeInteger(state.minBuy))
+        ) {
+            setPairAutoStatus(pair, direction, "اعداد تنظیمات نامعتبرند");
+            return;
+        }
+
+        state.enabled = true;
+        state.executing = false;
+        state.nextAllowedAt = 0;
+        state.blockedReason = "";
+        syncPairAutoControls(pair, direction);
+    }).catch(error => setPairAutoStatus(pair, direction, error.message));
+}
+
+function stopPairAuto(pair, direction) {
+    const state = getPairAutoDirectionState(pair, direction);
+    state.enabled = false;
+    state.nextAllowedAt = Number.POSITIVE_INFINITY;
+    state.blockedReason = "";
+    syncPairAutoControls(pair, direction);
+    setPairAutoStatus(pair, direction, "متوقف شد");
+}
+
+function requestPairAutoOrder(pair, direction, conditionIsHit) {
+    const state = getPairAutoDirectionState(pair, direction);
+    const otherDirectionState = getPairAutoDirectionState(
+        pair,
+        direction === "open" ? "offset" : "open"
+    );
+    const orderButtonId = direction === "open"
+        ? "opt-buy-order"
+        : "opt-sell-order";
+    const orderButton = pairElement(pair, orderButtonId);
+
+    if (
+        !state.enabled ||
+        state.executing ||
+        otherDirectionState.executing ||
+        Date.now() < state.nextAllowedAt ||
+        orderButton?.disabled
+    ) {
+        return;
+    }
+
+    state.executing = true;
+    syncPairAutoControls(pair, direction);
+
+    withPair(
+        pair,
+        async () => canRunPairAutoOrder(pair, direction, conditionIsHit)
+    )
+        .then(canRun => {
+            if (!canRun || !state.enabled || !conditionIsHit)
+                return null;
+
+            state.nextAllowedAt = Date.now() + state.intervalMs;
+            setPairAutoStatus(pair, direction, "در حال ارسال سفارش...", true);
+
+            // Invoke the existing button handler so manual and automatic
+            // executions always share the same order, verification and
+            // cancellation path.
+            return orderButton.onclick?.();
+        })
+        .catch(error => setPairAutoStatus(pair, direction, error.message))
+        .finally(() => {
+            state.executing = false;
+            syncPairAutoControls(pair, direction);
+        });
+}
+
 async function updatePair(pair) {
     if (!pair.symbolA || !pair.symbolB) return;
 
-    await withPair(pair, async () => {
+    const conditions = await withPair(pair, async () => {
         if (brokerAdapter.refreshOptionMarketData) {
             await brokerAdapter.refreshOptionMarketData().catch(() => {});
         }
@@ -3412,6 +3708,9 @@ async function updatePair(pair) {
         const offsetBid = getMonitorQuote(rawBidA, rawAskA);
         const offsetAsk = getMonitorQuote(rawAskB, rawBidB);
 
+        let buyIsHit = false;
+        let offsetIsHit = false;
+
         if (buyAsk.value != null && buyBid.value != null) {
             checkBuyCondition(
                 buyAsk.value,
@@ -3419,6 +3718,10 @@ async function updatePair(pair) {
                 buyAsk.isFallback,
                 buyBid.isFallback
             );
+            buyIsHit = getBuyConditionState(
+                buyAsk.value,
+                buyBid.value
+            ).isHit;
         } else {
             updateOptionAlarmState("buy", false);
         }
@@ -3430,12 +3733,96 @@ async function updatePair(pair) {
                 offsetBid.isFallback,
                 offsetAsk.isFallback
             );
+            offsetIsHit = getOffsetConditionState(
+                offsetBid.value,
+                offsetAsk.value
+            ).isHit;
         } else {
             updateOptionAlarmState("offset", false);
         }
+
+        return { buyIsHit, offsetIsHit };
+    });
+
+    requestPairAutoOrder(pair, "open", conditions?.buyIsHit);
+    requestPairAutoOrder(pair, "offset", conditions?.offsetIsHit);
+}
+function bindPairEvents() {
+    root.querySelectorAll("#opt-pairs .option-pair-card").forEach(card => {
+        const pair = pairStates.find(item => item.id === card.dataset.pairId);
+
+        if (!pair)
+            return;
+
+        [
+            "opt-symbol-a", "opt-symbol-b", "opt-strategy",
+            "opt-buy-quantity", "opt-buy-sell-quantity",
+            "opt-offset-buy-quantity", "opt-sell-quantity",
+            "opt-buy-execution-count", "opt-sell-execution-count",
+            "opt-max-value", "opt-premium", "opt-expected-return",
+            "opt-expected-offset-return"
+        ].forEach(id => card.querySelector(`#${id}`).addEventListener(
+            "change",
+            () => withPair(pair, async () => {
+                syncPairFromDom(pair);
+                optionStrategiesSignature = null;
+                await refreshOptionStrategies();
+                await updateAutoOptionValues();
+                syncPairFromDom(pair);
+            })
+        ));
+
+        [
+            "opt-auto-open-max-buy", "opt-auto-open-max-difference",
+            "opt-auto-open-interval", "opt-auto-offset-min-buy",
+            "opt-auto-offset-max-difference", "opt-auto-offset-interval"
+        ].forEach(id => card.querySelector(`#${id}`).addEventListener(
+            "change",
+            () => withPair(pair, async () => syncPairFromDom(pair))
+        ));
+
+        card.querySelector('[data-action="remove-pair"]').onclick = () => {
+            if (pairStates.length <= 1)
+                return;
+
+            stopPairAuto(pair, "open");
+            stopPairAuto(pair, "offset");
+            pairStates = pairStates.filter(item => item !== pair);
+            renderAllPairs();
+            savePairs();
+        };
+
+        card.querySelector("#opt-buy-order").onclick = () =>
+            withPair(pair, sendOptionBuyOrder);
+        card.querySelector("#opt-initial-position-order").onclick = () =>
+            withPair(pair, sendInitialOptionPositionOrder);
+        card.querySelector("#opt-sell-order").onclick = () =>
+            withPair(pair, sendOptionOffsetOrder);
+        card.querySelector("#opt-stop-execution").onclick = () => {
+            optionExecutionStopRequested = true;
+            pair.openStopRequested = true;
+        };
+        card.querySelector("#opt-stop-offset-execution").onclick = () => {
+            optionOffsetExecutionStopRequested = true;
+            pair.offsetStopRequested = true;
+        };
+        card.querySelector('[data-action="toggle-auto-open"]').onclick = () =>
+            togglePairAutoControls(pair, "open");
+        card.querySelector('[data-action="toggle-auto-offset"]').onclick = () =>
+            togglePairAutoControls(pair, "offset");
+        card.querySelector("#opt-auto-open-start").onclick = () =>
+            startPairAuto(pair, "open");
+        card.querySelector("#opt-auto-open-stop").onclick = () =>
+            stopPairAuto(pair, "open");
+        card.querySelector("#opt-auto-offset-start").onclick = () =>
+            startPairAuto(pair, "offset");
+        card.querySelector("#opt-auto-offset-stop").onclick = () =>
+            stopPairAuto(pair, "offset");
+
+        syncPairAutoControls(pair, "open");
+        syncPairAutoControls(pair, "offset");
     });
 }
-function bindPairEvents() { root.querySelectorAll("#opt-pairs .option-pair-card").forEach(card => { const pair = pairStates.find(item => item.id === card.dataset.pairId); if (!pair) return; ["opt-symbol-a", "opt-symbol-b", "opt-strategy", "opt-buy-quantity", "opt-buy-sell-quantity", "opt-offset-buy-quantity", "opt-sell-quantity", "opt-buy-execution-count", "opt-sell-execution-count", "opt-max-value", "opt-premium", "opt-expected-return", "opt-expected-offset-return"].forEach(id => card.querySelector(`#${id}`).addEventListener("change", () => withPair(pair, async () => { syncPairFromDom(pair); optionStrategiesSignature = null; await refreshOptionStrategies(); await updateAutoOptionValues(); syncPairFromDom(pair); }))); card.querySelector('[data-action="remove-pair"]').onclick = () => { if (pairStates.length > 1) { pairStates = pairStates.filter(item => item !== pair); renderAllPairs(); savePairs(); } }; card.querySelector("#opt-buy-order").onclick = () => withPair(pair, sendOptionBuyOrder); card.querySelector("#opt-initial-position-order").onclick = () => withPair(pair, sendInitialOptionPositionOrder); card.querySelector("#opt-sell-order").onclick = () => withPair(pair, sendOptionOffsetOrder); card.querySelector("#opt-stop-execution").onclick = () => { optionExecutionStopRequested = true; pair.openStopRequested = true; }; card.querySelector("#opt-stop-offset-execution").onclick = () => { optionOffsetExecutionStopRequested = true; pair.offsetStopRequested = true; }; }); }
 function bindPairQuantitySync() {
     const quantityPairs = [
         ["opt-buy-quantity", "opt-buy-sell-quantity"],

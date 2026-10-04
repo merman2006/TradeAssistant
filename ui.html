@@ -87,9 +87,17 @@
                             <label><input id="opt-buy-sell-quantity" type="number" min="0" value="10"></label>
                             <button id="opt-buy-order" class="buy-btn" type="button">بازکردن</button>
                             <button id="opt-initial-position-order" class="buy-btn" type="button">م اول</button>
-                            <button id="opt-stop-execution" class="sell-btn" type="button" disabled>توقف</button>
+                            <div class="pair-auto-trigger"><button id="opt-stop-execution" class="sell-btn" type="button" disabled>توقف</button><button class="pair-auto-toggle" data-action="toggle-auto-open" type="button" title="تنظیمات اجرای خودکار">⚙</button></div>
                         </div>
                         <div class="pair-status"><span id="opt-execution-progress"></span></div>
+                        <div class="pair-auto-controls" data-auto-controls="open" hidden>
+                            <label><span>حداکثر خرید</span><input id="opt-auto-open-max-buy" type="number" min="0" value="0"></label>
+                            <label><span>حداکثر اختلاف</span><input id="opt-auto-open-max-difference" type="number" min="0" value="0"></label>
+                            <label><span>فاصله (ms)</span><input id="opt-auto-open-interval" type="number" min="0" value="1000"></label>
+                            <button id="opt-auto-open-start" class="buy-btn" type="button">اجرای خودکار</button>
+                            <button id="opt-auto-open-stop" class="sell-btn" type="button" disabled>توقف</button>
+                            <span id="opt-auto-open-status" class="pair-auto-status"></span>
+                        </div>
                     </section>
                     <section class="pair-monitor-section pair-offset-section">
                         <div class="pair-values">
@@ -107,9 +115,17 @@
                             <label><input id="opt-offset-buy-quantity" type="number" min="0" value="10"></label>
                             <label><input id="opt-sell-quantity" type="number" min="0" value="10"></label>
                             <button id="opt-sell-order" class="sell-btn" type="button">آفست</button>
-                            <button id="opt-stop-offset-execution" class="sell-btn" type="button" disabled>توقف</button>
+                            <div class="pair-auto-trigger"><button id="opt-stop-offset-execution" class="sell-btn" type="button" disabled>توقف</button><button class="pair-auto-toggle" data-action="toggle-auto-offset" type="button" title="تنظیمات اجرای خودکار">⚙</button></div>
                         </div>
                         <div class="pair-status"><span id="opt-offset-execution-progress"></span></div>
+                        <div class="pair-auto-controls" data-auto-controls="offset" hidden>
+                            <label><span>حداقل خرید</span><input id="opt-auto-offset-min-buy" type="number" min="0" value="0"></label>
+                            <label><span>حداکثر اختلاف</span><input id="opt-auto-offset-max-difference" type="number" min="0" value="0"></label>
+                            <label><span>فاصله (ms)</span><input id="opt-auto-offset-interval" type="number" min="0" value="1000"></label>
+                            <button id="opt-auto-offset-start" class="sell-btn" type="button">اجرای خودکار</button>
+                            <button id="opt-auto-offset-stop" class="sell-btn" type="button" disabled>توقف</button>
+                            <span id="opt-auto-offset-status" class="pair-auto-status"></span>
+                        </div>
                     </section>
                 </div>
             </article>

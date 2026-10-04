@@ -2068,3 +2068,173 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
+/* Per-pair automatic execution controls stay hidden until their small gear is opened. */
+.pair-open-section .pair-orders .pair-auto-trigger,
+.pair-offset-section .pair-orders .pair-auto-trigger {
+    grid-row: 1 !important;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+}
+
+.pair-open-section .pair-orders .pair-auto-trigger {
+    grid-column: 12;
+}
+
+.pair-offset-section .pair-orders .pair-auto-trigger {
+    grid-column: 11;
+}
+
+.pair-auto-trigger #opt-stop-execution,
+.pair-auto-trigger #opt-stop-offset-execution {
+    flex: 1 1 auto;
+    width: auto !important;
+    min-width: 0 !important;
+}
+
+.pair-auto-toggle {
+    flex: 0 0 18px;
+    width: 18px !important;
+    min-width: 18px !important;
+    height: 20px;
+    padding: 0 !important;
+    border: 1px solid #cbd5e1;
+    border-radius: 3px;
+    background: #f8fafc;
+    color: #334155;
+    cursor: pointer;
+    font-size: 11px;
+    line-height: 1;
+}
+
+.pair-auto-toggle.auto-active {
+    border-color: #15803d;
+    background: #16a34a;
+    color: #fff;
+}
+
+.pair-auto-controls[hidden] {
+    display: none !important;
+}
+
+.pair-open-section.auto-controls-open,
+.pair-offset-section.auto-controls-open {
+    grid-template-rows: 24px 24px !important;
+    grid-auto-rows: 24px;
+    height: auto;
+    min-height: 56px;
+}
+
+.pair-auto-controls {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: 98px 113px 103px 78px 48px minmax(0, 1fr);
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+    padding-top: 4px;
+    border-top: 1px dashed #cbd5e1;
+    color: #475569;
+    font-size: 9px;
+    white-space: nowrap;
+}
+
+.pair-auto-controls label {
+    display: grid !important;
+    grid-template-columns: max-content 50px;
+    align-items: center;
+    gap: 3px;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    white-space: nowrap;
+}
+
+.pair-auto-controls input {
+    width: 50px !important;
+    height: 20px;
+    min-width: 0 !important;
+    max-width: 50px !important;
+    padding: 1px 3px;
+    border: 1px solid #cbd5e1;
+    border-radius: 3px;
+    direction: ltr;
+    text-align: left;
+    font-size: 10px;
+}
+
+.pair-auto-controls button {
+    width: 100%;
+    height: 20px;
+    padding: 1px 5px;
+    font-size: 9px;
+    white-space: nowrap;
+}
+
+.pair-auto-controls label:nth-of-type(1) { grid-column: 1; }
+.pair-auto-controls label:nth-of-type(2) { grid-column: 2; }
+.pair-auto-controls label:nth-of-type(3) { grid-column: 3; }
+
+#opt-auto-open-start,
+#opt-auto-offset-start {
+    grid-column: 4;
+    width: 78px !important;
+    min-width: 78px !important;
+    max-width: 78px !important;
+}
+
+#opt-auto-open-stop,
+#opt-auto-offset-stop {
+    grid-column: 5;
+    width: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
+}
+
+.pair-auto-status {
+    grid-column: 6;
+    grid-row: 1;
+    min-width: 0;
+    min-height: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pair-auto-status.running {
+    color: #15803d;
+    font-weight: bold;
+}
+
+.pair-auto-status.blocked {
+    color: #b91c1c;
+    font-weight: bold;
+}
+
+/* Reserve room for the two automatic-settings triggers without shrinking Stop. */
+.pair-table-header,
+.option-pair-card {
+    grid-template-columns: 350px 665px 625px !important;
+    min-width: 1645px !important;
+}
+
+.pair-table-header .pair-open-header,
+.option-pair-card .pair-open-section {
+    width: 665px !important;
+    min-width: 665px !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 55px 55px 55px 65px 40px 55px 55px 60px 45px 70px !important;
+}
+
+.pair-table-header .pair-offset-header,
+.option-pair-card .pair-offset-section {
+    width: 625px !important;
+    min-width: 625px !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 55px 55px 55px 65px 40px 55px 55px 55px 70px !important;
+}
+
+#ppt-panel {
+    width: min(1680px, calc(100vw - 24px));
+}
