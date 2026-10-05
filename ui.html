@@ -24,6 +24,7 @@
         <div class="option-toolbar">
             <button id="opt-add-pair" class="primary-btn" type="button">+ افزودن زوج</button>
             <button id="opt-refresh-pairs" type="button">بازخوانی نمادها</button>
+            <button id="opt-share-all-pairs" type="button">اشتراک همه</button>
             <span id="option-symbols-status"></span>
         </div>
 
@@ -63,7 +64,10 @@
             <article class="option-pair-card" data-pair-id="">
                 <div class="pair-symbol-row">
                     <div class="pair-symbols">
-                        <button class="pair-remove" data-action="remove-pair" type="button" aria-label="حذف زوج">×</button>
+                        <div class="pair-actions">
+                            <button class="pair-remove" data-action="remove-pair" type="button" aria-label="حذف زوج" title="حذف زوج">×</button>
+                            <button class="pair-share" data-action="share-pair" type="button" aria-label="کپی مشخصات زوج" title="کپی مشخصات زوج">↗</button>
+                        </div>
                         <label><select id="opt-symbol-a"><option value="">در حال دریافت نمادها...</option></select></label>
                         <label><select id="opt-symbol-b"><option value="">در حال دریافت نمادها...</option></select></label>
                     </div>
@@ -89,7 +93,7 @@
                             <button id="opt-initial-position-order" class="buy-btn" type="button">م اول</button>
                             <div class="pair-auto-trigger"><button id="opt-stop-execution" class="sell-btn" type="button" disabled>توقف</button><button class="pair-auto-toggle" data-action="toggle-auto-open" type="button" title="تنظیمات اجرای خودکار">⚙</button></div>
                         </div>
-                        <div class="pair-status"><span id="opt-execution-progress"></span></div>
+                        <div class="pair-status"><button class="pair-status-dismiss" data-action="clear-open-message" type="button" title="بستن پیام" aria-label="بستن پیام">×</button><span id="opt-execution-progress"></span></div>
                         <div class="pair-auto-controls" data-auto-controls="open" hidden>
                             <label><span>حداکثر خرید</span><input id="opt-auto-open-max-buy" type="number" min="0" value="0"></label>
                             <label><span>حداکثر اختلاف</span><input id="opt-auto-open-max-difference" type="number" min="0" value="0"></label>
@@ -117,9 +121,9 @@
                             <button id="opt-sell-order" class="sell-btn" type="button">آفست</button>
                             <div class="pair-auto-trigger"><button id="opt-stop-offset-execution" class="sell-btn" type="button" disabled>توقف</button><button class="pair-auto-toggle" data-action="toggle-auto-offset" type="button" title="تنظیمات اجرای خودکار">⚙</button></div>
                         </div>
-                        <div class="pair-status"><span id="opt-offset-execution-progress"></span></div>
+                        <div class="pair-status"><button class="pair-status-dismiss" data-action="clear-offset-message" type="button" title="بستن پیام" aria-label="بستن پیام">×</button><span id="opt-offset-execution-progress"></span></div>
                         <div class="pair-auto-controls" data-auto-controls="offset" hidden>
-                            <label><span>حداقل خرید</span><input id="opt-auto-offset-min-buy" type="number" min="0" value="0"></label>
+                            <label><span>تعداد مانده</span><input id="opt-auto-offset-min-buy" type="number" min="0" value="0"></label>
                             <label><span>حداکثر اختلاف</span><input id="opt-auto-offset-max-difference" type="number" min="0" value="0"></label>
                             <label><span>فاصله (ms)</span><input id="opt-auto-offset-interval" type="number" min="0" value="1000"></label>
                             <button id="opt-auto-offset-start" class="sell-btn" type="button">اجرای خودکار</button>

@@ -1757,7 +1757,7 @@ async function sendOptionBuyOrder() {
     const button = byId("opt-buy-order");
     const stopButton = byId("opt-stop-execution");
     const progress = byId("opt-execution-progress");
-    const status = byId("option-symbols-status");
+    const status = progress;
     const instrumentIdA = byId("opt-symbol-a").value;
     const instrumentIdB = byId("opt-symbol-b").value;
     const selectedStrategy = byId("opt-strategy").value;
@@ -1816,7 +1816,6 @@ async function sendOptionBuyOrder() {
         stopButton.disabled = false;
         button.innerText = "باز کردن موقعیت";
         progress.innerText = "در حال اجرا...";
-        status.innerText = "";
 
         let completedCount = 0;
 
@@ -2048,7 +2047,6 @@ async function sendOptionBuyOrder() {
         stopButton.disabled = true;
         button.innerText = "باز کردن موقعیت";
         stopButton.innerText = "توقف اجرا";
-        progress.innerText = "";
     }
 }
 
@@ -2143,7 +2141,7 @@ async function sendInitialOptionPositionOrder() {
     const button = byId("opt-initial-position-order");
     const stopButton = byId("opt-stop-execution");
     const progress = byId("opt-execution-progress");
-    const status = byId("option-symbols-status");
+    const status = progress;
     const instrumentIdA = byId("opt-symbol-a").value;
     const instrumentIdB = byId("opt-symbol-b").value;
     const buyQuantityA = +byId("opt-buy-quantity").value;
@@ -2193,7 +2191,6 @@ async function sendInitialOptionPositionOrder() {
         button.disabled = true;
         stopButton.disabled = false;
         progress.innerText = "در حال اجرای موقعیت اول...";
-        status.innerText = "";
 
         let completedCount = 0;
 
@@ -2435,7 +2432,6 @@ async function sendInitialOptionPositionOrder() {
         button.disabled = false;
         stopButton.disabled = true;
         stopButton.innerText = "توقف اجرا";
-        progress.innerText = "";
     }
 }
 
@@ -2446,7 +2442,7 @@ async function sendOptionOffsetOrder() {
     const button = byId("opt-sell-order");
     const stopButton = byId("opt-stop-offset-execution");
     const progress = byId("opt-offset-execution-progress");
-    const status = byId("option-symbols-status");
+    const status = progress;
     const instrumentIdA = byId("opt-symbol-a").value;
     const instrumentIdB = byId("opt-symbol-b").value;
     const selectedStrategy = byId("opt-strategy").value;
@@ -2503,9 +2499,7 @@ async function sendOptionOffsetOrder() {
         optionOffsetExecutionStopRequested = false;
         button.disabled = true;
         stopButton.disabled = false;
-        button.innerText = "آفست موقعیت";
         progress.innerText = "در حال اجرا...";
-        status.innerText = "";
 
         let completedCount = 0;
 
@@ -2737,9 +2731,6 @@ async function sendOptionOffsetOrder() {
 
         button.disabled = false;
         stopButton.disabled = true;
-        button.innerText = "آفست موقعیت";
-        stopButton.innerText = "توقف اجرا";
-        progress.innerText = "";
     }
 }
 
@@ -3747,6 +3738,49 @@ async function updatePair(pair) {
     requestPairAutoOrder(pair, "open", conditions?.buyIsHit);
     requestPairAutoOrder(pair, "offset", conditions?.offsetIsHit);
 }
+
+function getPairShareMessage(pair, card = getPairCard(pair)) {
+    if (!card)
+        return "";
+
+    syncPairFromDom(pair);
+
+    const getSymbolTitle = id => {
+        const select = card.querySelector(`#${id}`);
+        return select?.selectedOptions[0]?.textContent.trim() || select?.value || "-";
+    };
+    const getValue = id => card.querySelector(`#${id}`)?.value || "-";
+
+    return `${getSymbolTitle("opt-symbol-a")} - ${getSymbolTitle("opt-symbol-b")} ، حداقل بازده: ${getValue("opt-expected-return")} ، پریمیوم: ${getValue("opt-premium")} ، حداقل بازده آفست: ${getValue("opt-expected-offset-return")}`;
+}
+
+async function copyPairShareText(message) {
+    if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(message);
+        return;
+    }
+
+    const copyArea = document.createElement("textarea");
+    copyArea.value = message;
+    copyArea.style.cssText = "position:fixed;opacity:0;pointer-events:none;";
+    document.body.appendChild(copyArea);
+    copyArea.select();
+    const copied = document.execCommand("copy");
+    copyArea.remove();
+
+    if (!copied)
+        throw new Error("کپی در کلیپ‌بورد انجام نشد.");
+}
+
+function showShareCopied(button, label, title) {
+    button.innerText = "✓";
+    button.title = "کپی شد";
+    setTimeout(() => {
+        button.innerText = label;
+        button.title = title;
+    }, 1200);
+}
+
 function bindPairEvents() {
     root.querySelectorAll("#opt-pairs .option-pair-card").forEach(card => {
         const pair = pairStates.find(item => item.id === card.dataset.pairId);
@@ -3792,6 +3826,17 @@ function bindPairEvents() {
             savePairs();
         };
 
+        card.querySelector('[data-action="share-pair"]').onclick = async event => {
+            const shareButton = event.currentTarget;
+
+            try {
+                await copyPairShareText(getPairShareMessage(pair, card));
+                showShareCopied(shareButton, "↗", "کپی مشخصات زوج");
+            } catch (error) {
+                shareButton.title = error.message || "کپی در کلیپ‌بورد انجام نشد.";
+            }
+        };
+
         card.querySelector("#opt-buy-order").onclick = () =>
             withPair(pair, sendOptionBuyOrder);
         card.querySelector("#opt-initial-position-order").onclick = () =>
@@ -3805,6 +3850,16 @@ function bindPairEvents() {
         card.querySelector("#opt-stop-offset-execution").onclick = () => {
             optionOffsetExecutionStopRequested = true;
             pair.offsetStopRequested = true;
+        };
+        card.querySelector('[data-action="clear-open-message"]').onclick = () => {
+            const progress = card.querySelector("#opt-execution-progress");
+            progress.innerText = "";
+            progress.classList.remove("success");
+        };
+        card.querySelector('[data-action="clear-offset-message"]').onclick = () => {
+            const progress = card.querySelector("#opt-offset-execution-progress");
+            progress.innerText = "";
+            progress.classList.remove("success");
         };
         card.querySelector('[data-action="toggle-auto-open"]').onclick = () =>
             togglePairAutoControls(pair, "open");
@@ -3897,6 +3952,20 @@ function showOptionError(error) { byId("option-symbols-status").innerText = erro
 
 byId("opt-add-pair").onclick = addPair;
 byId("opt-refresh-pairs").onclick = () => refreshAllPairs().catch(showOptionError);
+byId("opt-share-all-pairs").onclick = async event => {
+    const shareButton = event.currentTarget;
+    const message = pairStates
+        .map(pair => getPairShareMessage(pair))
+        .filter(Boolean)
+        .join("\n");
+
+    try {
+        await copyPairShareText(message);
+        showShareCopied(shareButton, "اشتراک همه", "کپی مشخصات همه زوج‌ها");
+    } catch (error) {
+        shareButton.title = error.message || "کپی در کلیپ‌بورد انجام نشد.";
+    }
+};
 byId("opt-settings-toggle").onclick = () => { const body = byId("opt-settings-body"); body.hidden = !body.hidden; byId("opt-settings-toggle").innerText = body.hidden ? "+" : "-"; saveGlobalSettings(); };
 ["opt-auto-values", "opt-auto-buy-buttons", "opt-sync-order-quantities", "opt-limit-order-quantity-to-queue", "opt-verify-buy-position", "opt-alarm-enabled", "opt-alarm-count", "opt-alarm-interval"].forEach(id => byId(id).addEventListener("change", () => {
     saveGlobalSettings();

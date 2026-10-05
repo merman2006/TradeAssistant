@@ -2057,16 +2057,49 @@
     height: 14px;
     min-height: 14px;
     overflow: hidden;
-    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 3px;
+    direction: rtl;
+    pointer-events: auto;
     text-align: right;
     white-space: nowrap;
 }
 
 .pair-monitor-section .pair-status span {
     display: block;
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: calc(100% - 18px);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    pointer-events: none;
+}
+
+.pair-status-dismiss {
+    flex: 0 0 13px;
+    width: 13px;
+    min-width: 13px;
+    height: 13px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 12px;
+}
+
+.pair-status-dismiss:hover {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.pair-status:has(span:empty) .pair-status-dismiss {
+    display: none;
 }
 
 /* Per-pair automatic execution controls stay hidden until their small gear is opened. */
@@ -2237,4 +2270,85 @@
 
 #ppt-panel {
     width: min(1680px, calc(100vw - 24px));
+}
+
+.pair-monitor-section .pair-status span.success {
+    color: #15803d;
+}
+
+/* Keep the top pair-management bar deliberately compact. */
+.ppt-content#ppt-option > .option-toolbar {
+    min-height: 22px;
+    margin-bottom: 3px;
+    gap: 4px;
+}
+
+.option-toolbar .primary-btn,
+.option-toolbar > button {
+    min-height: 22px;
+    height: 22px;
+    padding: 2px 6px;
+    font-size: 9px;
+}
+
+.ppt-content#ppt-option > .option-global-settings {
+    min-width: 230px;
+}
+
+.option-settings-heading {
+    min-height: 22px;
+    padding: 2px 4px;
+    gap: 4px;
+    font-size: 9px;
+}
+
+.option-settings-heading button {
+    width: 16px;
+    height: 16px;
+    font-size: 11px;
+}
+
+/* The share control fits beside Remove inside the identity column only. */
+.pair-table-header .pair-identity-header,
+.option-pair-card .pair-symbol-row {
+    grid-template-columns: 38px 71px 71px 150px !important;
+}
+
+.option-pair-card .pair-symbol-row .pair-actions {
+    grid-column: 1;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.option-pair-card .pair-symbol-row .pair-actions .pair-remove,
+.option-pair-card .pair-symbol-row .pair-actions .pair-share {
+    flex: 0 0 16px;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 16px;
+    text-align: center;
+}
+
+.option-pair-card .pair-symbol-row .pair-actions .pair-share {
+    background: #e0f2fe;
+    color: #0369a1;
+}
+
+.option-pair-card .pair-symbol-row .pair-actions .pair-share:hover {
+    background: #bae6fd;
+    color: #075985;
+}
+
+.option-pair-card .pair-symbol-row .pair-symbols label,
+.option-pair-card .pair-symbol-row .pair-symbols select {
+    width: 71px !important;
+    min-width: 71px !important;
+    max-width: 71px !important;
 }
