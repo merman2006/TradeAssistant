@@ -556,7 +556,17 @@ syncDerivativeTabVisibility();
             offsetY = savedPosition.y;
     } catch (_) {}
 
-    panel.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+    function applyPanelPosition() {
+        panel.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+
+        const panelTop = panel.getBoundingClientRect().top;
+        if (panelTop < 0) {
+            offsetY -= panelTop;
+            panel.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+        }
+    }
+
+    applyPanelPosition();
 
     header.addEventListener("mousedown", e => {
 
@@ -576,8 +586,7 @@ syncDerivativeTabVisibility();
         offsetX = startOffsetX + (e.clientX - startX);
         offsetY = startOffsetY + (e.clientY - startY);
 
-        panel.style.transform =
-            `translate(${offsetX}px, ${offsetY}px)`;
+        applyPanelPosition();
     });
 
     document.addEventListener("mouseup", () => {
@@ -589,6 +598,8 @@ syncDerivativeTabVisibility();
             JSON.stringify({ x: offsetX, y: offsetY })
         );
     });
+
+    window.addEventListener("resize", applyPanelPosition);
 
 })();
 
@@ -933,6 +944,160 @@ async function waitForOptionPositionQuantity(instrumentId, label) {
 function isOptionBuyPositionVerificationEnabled() {
 
     return !!byId("opt-verify-buy-position")?.checked;
+}
+
+const DEFAULT_MINIMUM_OPTION_PURCHASE_POWER = 10000000;
+
+function getOptionPurchasePowerDigits(value) {
+    return normalizeNumberText(value).replace(/\D/g, "");
+}
+
+function formatOptionPurchasePowerDigits(digits) {
+    const normalizedDigits = String(digits || "").replace(/^0+(?=\d)/, "");
+
+    return normalizedDigits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+function normalizeMinimumOptionPurchasePowerInput() {
+    const input = byId("opt-min-purchase-power");
+
+    if (!input)
+        return;
+
+    const digits = getOptionPurchasePowerDigits(input.value);
+
+    if (!digits) {
+        input.value = formatOptionPurchasePowerDigits(
+            DEFAULT_MINIMUM_OPTION_PURCHASE_POWER
+        );
+        return;
+    }
+
+    input.value = formatOptionPurchasePowerDigits(digits);
+}
+
+function formatMinimumOptionPurchasePowerWhileTyping(input) {
+    const rawValue = input.value;
+    const cursorPosition = input.selectionStart ?? rawValue.length;
+    const digitsBeforeCursor = getOptionPurchasePowerDigits(
+        rawValue.slice(0, cursorPosition)
+    ).length;
+    const formattedValue = formatOptionPurchasePowerDigits(
+        getOptionPurchasePowerDigits(rawValue)
+    );
+
+    input.value = formattedValue;
+
+    let nextCursorPosition = formattedValue.length;
+
+    if (digitsBeforeCursor === 0) {
+        nextCursorPosition = 0;
+    } else {
+        let seenDigits = 0;
+
+        for (let index = 0; index < formattedValue.length; index++) {
+            if (/\d/.test(formattedValue[index]))
+                seenDigits++;
+
+            if (seenDigits === digitsBeforeCursor) {
+                nextCursorPosition = index + 1;
+                break;
+            }
+        }
+    }
+
+    input.setSelectionRange(nextCursorPosition, nextCursorPosition);
+}
+
+function getMinimumOptionPurchasePower() {
+    const rawValue = byId("opt-min-purchase-power")?.value.trim();
+
+    if (!rawValue)
+        return DEFAULT_MINIMUM_OPTION_PURCHASE_POWER;
+
+    const value = parseOptionNumber(rawValue);
+
+    return Number.isSafeInteger(value) && value >= 0
+        ? value
+        : null;
+}
+
+function getCurrentOptionPurchasePower() {
+    const valueElement = document.querySelector(
+        'client-accounting-financial-info-widget[type="optionPurchasePower"] .c-number'
+    );
+
+    return parseOptionNumber(valueElement?.textContent);
+}
+
+function formatOptionPurchasePower(value) {
+    return Number(value).toLocaleString("fa-IR");
+}
+
+function getOptionPurchasePowerCheck() {
+    const minimum = getMinimumOptionPurchasePower();
+
+    if (minimum === null) {
+        return {
+            ok: false,
+            reason: "حداقل قدرت خرید معتبر نیست."
+        };
+    }
+
+    if (minimum === 0)
+        return { ok: true, minimum, current: null };
+
+    const current = getCurrentOptionPurchasePower();
+
+    if (!Number.isFinite(current)) {
+        return {
+            ok: false,
+            reason: "قدرت خرید اختیار از صفحه کارگزاری قابل خواندن نیست."
+        };
+    }
+
+    if (current < minimum) {
+        return {
+            ok: false,
+            minimum,
+            current,
+            reason: `قدرت خرید (${formatOptionPurchasePower(current)}) از حداقل تعیین‌شده (${formatOptionPurchasePower(minimum)}) کمتر است.`
+        };
+    }
+
+    return { ok: true, minimum, current };
+}
+
+function confirmManualOpenPurchasePower(status) {
+    const powerCheck = getOptionPurchasePowerCheck();
+
+    if (powerCheck.ok)
+        return true;
+
+    if (powerCheck.current === undefined) {
+        status.innerText = powerCheck.reason;
+        return false;
+    }
+
+    const confirmed = window.confirm(
+        `${powerCheck.reason}\nآیا با وجود این وضعیت، بازکردن موقعیت انجام شود؟`
+    );
+
+    if (!confirmed)
+        status.innerText = "بازکردن موقعیت به‌دلیل کمبود قدرت خرید لغو شد.";
+
+    return confirmed;
+}
+
+function canRunPairAutoWithPurchasePower(pair, direction) {
+    const powerCheck = getOptionPurchasePowerCheck();
+
+    if (!powerCheck.ok) {
+        setPairAutoBlocked(pair, direction, `${powerCheck.reason} اجرای خودکار انجام نشد.`);
+        return false;
+    }
+
+    return true;
 }
 
 async function verifyOptionBuyFromPositions({
@@ -1809,6 +1974,18 @@ async function sendOptionBuyOrder() {
         return;
     }
 
+    const activePair = getActivePair();
+    const isAutomaticExecution = !!activePair?.auto?.open?.executing;
+
+    if (isAutomaticExecution) {
+        if (!canRunPairAutoWithPurchasePower(activePair, "open")) {
+            status.innerText = activePair.auto.open.blockedReason;
+            return;
+        }
+    } else if (!confirmManualOpenPurchasePower(status)) {
+        return;
+    }
+
     try {
 
         optionExecutionStopRequested = false;
@@ -1876,6 +2053,11 @@ async function sendOptionBuyOrder() {
             let buyPositionBefore = null;
 
             if (buyQuantityForStep > 0) {
+                if (isAutomaticExecution && !canRunPairAutoWithPurchasePower(activePair, "open")) {
+                    status.innerText = activePair.auto.open.blockedReason;
+                    return;
+                }
+
                 if (isOptionBuyPositionVerificationEnabled()) {
                     progress.innerText = "در حال دریافت موقعیت خرید A...";
                     buyPositionBefore = await waitForOptionPositionQuantity(
@@ -2182,6 +2364,10 @@ async function sendInitialOptionPositionOrder() {
 
     if (!Number.isInteger(executionCount) || executionCount <= 0) {
         status.innerText = "تعداد اجرا را به‌صورت عدد صحیح و بزرگ‌تر از صفر وارد کنید.";
+        return;
+    }
+
+    if (!confirmManualOpenPurchasePower(status)) {
         return;
     }
 
@@ -2494,6 +2680,14 @@ async function sendOptionOffsetOrder() {
         return;
     }
 
+    const activePair = getActivePair();
+    const isAutomaticExecution = !!activePair?.auto?.offset?.executing;
+
+    if (isAutomaticExecution && !canRunPairAutoWithPurchasePower(activePair, "offset")) {
+        status.innerText = activePair.auto.offset.blockedReason;
+        return;
+    }
+
     try {
 
         optionOffsetExecutionStopRequested = false;
@@ -2560,6 +2754,11 @@ async function sendOptionOffsetOrder() {
             let buyPositionBefore = null;
 
             if (buyQuantityForStep > 0) {
+                if (isAutomaticExecution && !canRunPairAutoWithPurchasePower(activePair, "offset")) {
+                    status.innerText = activePair.auto.offset.blockedReason;
+                    return;
+                }
+
                 if (isOptionBuyPositionVerificationEnabled()) {
                     progress.innerText = "در حال دریافت موقعیت فروش B...";
                     buyPositionBefore = await waitForOptionPositionQuantity(
@@ -3313,8 +3512,8 @@ function createPairState(source = {}) {
 
 function savePairs() { localStorage.setItem(PAIRS_STORAGE_KEY, JSON.stringify(pairStates.map(pair => ({ id: pair.id, symbolA: pair.symbolA, symbolB: pair.symbolB, strategyKey: pair.strategyKey, quantities: pair.quantities, values: pair.values, executionCount: pair.executionCount, offsetExecutionCount: pair.offsetExecutionCount, auto: { open: { maxBuy: pair.auto.open.maxBuy, maxDifference: pair.auto.open.maxDifference, intervalMs: pair.auto.open.intervalMs }, offset: { minBuy: pair.auto.offset.minBuy, maxDifference: pair.auto.offset.maxDifference, intervalMs: pair.auto.offset.intervalMs } } })))); }
 function loadPairs() { try { const saved = JSON.parse(localStorage.getItem(PAIRS_STORAGE_KEY) || "null"); pairStates = Array.isArray(saved) && saved.length ? saved.map(createPairState) : [createPairState()]; } catch (_) { pairStates = [createPairState()]; } }
-function saveGlobalSettings() { const ids = ["opt-auto-values", "opt-auto-buy-buttons", "opt-sync-order-quantities", "opt-limit-order-quantity-to-queue", "opt-verify-buy-position", "opt-alarm-enabled"]; const values = Object.fromEntries(ids.map(id => [id, byId(id)?.checked])); ["opt-alarm-count", "opt-alarm-interval"].forEach(id => values[id] = byId(id)?.value); values["opt-settings-open"] = !byId("opt-settings-body")?.hidden; localStorage.setItem(GLOBAL_STORAGE_KEY, JSON.stringify(values)); }
-function loadGlobalSettings() { let values = {}; try { values = JSON.parse(localStorage.getItem(GLOBAL_STORAGE_KEY) || "{}"); } catch (_) {} ["opt-auto-values", "opt-auto-buy-buttons", "opt-sync-order-quantities", "opt-limit-order-quantity-to-queue", "opt-verify-buy-position", "opt-alarm-enabled"].forEach(id => { if (typeof values[id] === "boolean") byId(id).checked = values[id]; }); ["opt-alarm-count", "opt-alarm-interval"].forEach(id => { if (values[id] !== undefined) byId(id).value = values[id]; }); if (values["opt-settings-open"]) { byId("opt-settings-body").hidden = false; byId("opt-settings-toggle").innerText = "-"; } }
+function saveGlobalSettings() { const ids = ["opt-auto-values", "opt-auto-buy-buttons", "opt-sync-order-quantities", "opt-limit-order-quantity-to-queue", "opt-verify-buy-position", "opt-alarm-enabled"]; const values = Object.fromEntries(ids.map(id => [id, byId(id)?.checked])); ["opt-alarm-count", "opt-alarm-interval", "opt-min-purchase-power"].forEach(id => values[id] = byId(id)?.value); values["opt-settings-open"] = !byId("opt-settings-body")?.hidden; localStorage.setItem(GLOBAL_STORAGE_KEY, JSON.stringify(values)); }
+function loadGlobalSettings() { let values = {}; try { values = JSON.parse(localStorage.getItem(GLOBAL_STORAGE_KEY) || "{}"); } catch (_) {} ["opt-auto-values", "opt-auto-buy-buttons", "opt-sync-order-quantities", "opt-limit-order-quantity-to-queue", "opt-verify-buy-position", "opt-alarm-enabled"].forEach(id => { if (typeof values[id] === "boolean") byId(id).checked = values[id]; }); ["opt-alarm-count", "opt-alarm-interval", "opt-min-purchase-power"].forEach(id => { if (values[id] !== undefined) byId(id).value = values[id]; }); if (values["opt-settings-open"]) { byId("opt-settings-body").hidden = false; byId("opt-settings-toggle").innerText = "-"; } }
 function getPairCard(pair) { return root.querySelector(`[data-pair-id="${CSS.escape(pair.id)}"]`); }
 function pairElement(pair, id) { return getPairCard(pair)?.querySelector(`#${id}`); }
 async function withPair(pair, task) {
@@ -3523,6 +3722,10 @@ async function canRunPairAutoOrder(pair, direction, showCheckingStatus = true) {
         (direction === "offset" && !isNonNegativeInteger(state.minBuy))
     ) {
         setPairAutoBlocked(pair, direction, "اعداد تنظیمات نامعتبرند");
+        return false;
+    }
+
+    if (!canRunPairAutoWithPurchasePower(pair, direction)) {
         return false;
     }
 
@@ -3967,7 +4170,13 @@ byId("opt-share-all-pairs").onclick = async event => {
     }
 };
 byId("opt-settings-toggle").onclick = () => { const body = byId("opt-settings-body"); body.hidden = !body.hidden; byId("opt-settings-toggle").innerText = body.hidden ? "+" : "-"; saveGlobalSettings(); };
-["opt-auto-values", "opt-auto-buy-buttons", "opt-sync-order-quantities", "opt-limit-order-quantity-to-queue", "opt-verify-buy-position", "opt-alarm-enabled", "opt-alarm-count", "opt-alarm-interval"].forEach(id => byId(id).addEventListener("change", () => {
+byId("opt-min-purchase-power").addEventListener("input", event => {
+    formatMinimumOptionPurchasePowerWhileTyping(event.currentTarget);
+});
+["opt-auto-values", "opt-auto-buy-buttons", "opt-sync-order-quantities", "opt-limit-order-quantity-to-queue", "opt-verify-buy-position", "opt-alarm-enabled", "opt-alarm-count", "opt-alarm-interval", "opt-min-purchase-power"].forEach(id => byId(id).addEventListener("change", () => {
+    if (id === "opt-min-purchase-power")
+        normalizeMinimumOptionPurchasePowerInput();
+
     saveGlobalSettings();
     if (id === "opt-alarm-enabled") syncOptionAlarmControlsVisibility();
     if (id === "opt-sync-order-quantities") syncAllPairQuantities();
@@ -3976,7 +4185,7 @@ byId("opt-settings-toggle").onclick = () => { const body = byId("opt-settings-bo
     }
 }));
 byId("opt-settings-reset").onclick = () => { localStorage.removeItem(GLOBAL_STORAGE_KEY); location.reload(); };
-loadPairs(); loadGlobalSettings(); renderAllPairs(); refreshAllPairs().catch(showOptionError);
+loadPairs(); loadGlobalSettings(); normalizeMinimumOptionPurchasePowerInput(); renderAllPairs(); refreshAllPairs().catch(showOptionError);
 setInterval(() => refreshAllPairs().catch(showOptionError), 2000);
 setInterval(() => pairStates.forEach(pair => updatePair(pair).catch(() => {})), 1000);
 /*---------------------------------------------------------------------*/
