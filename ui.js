@@ -644,7 +644,7 @@ const OPTION_POSITIONS_TAB_LABEL = "موقعیت های اختیار";
 const OPTION_BUY_POSITION_LABEL = "موقعیت خرید";
 const OPTION_SELL_POSITION_LABEL = "موقعیت فروش";
 const OPTION_POSITION_READ_TIMEOUT_MS = 5000;
-const OPTION_BUY_VERIFICATION_TIMEOUT_MS = 20000;
+const DEFAULT_OPTION_BUY_VERIFICATION_TIMEOUT_SECONDS = 10;
 const OPTION_BUY_VERIFICATION_POLL_MS = 500;
 const OPTION_STRATEGY_SELECTORS = [
     'ng-select[formcontrolname="buyOptionStrategyUniqueKey"]',
@@ -1022,6 +1022,27 @@ function getMinimumOptionPurchasePower() {
         : null;
 }
 
+function getGlobalOptionOrderVerificationTimeoutSeconds() {
+    const seconds = parseOptionNumber(
+        byId("opt-order-verification-timeout")?.value
+    );
+
+    return Number.isFinite(seconds) && seconds > 0
+        ? seconds
+        : DEFAULT_OPTION_BUY_VERIFICATION_TIMEOUT_SECONDS;
+}
+
+function getOptionOrderVerificationTimeoutMs(pair = null, direction = null) {
+    const pairTimeout = pair && direction
+        ? parseOptionNumber(pair.auto?.[direction]?.verificationTimeoutSeconds)
+        : null;
+    const seconds = Number.isFinite(pairTimeout) && pairTimeout > 0
+        ? pairTimeout
+        : getGlobalOptionOrderVerificationTimeoutSeconds();
+
+    return Math.round(seconds * 1000);
+}
+
 function getCurrentOptionPurchasePower() {
     const valueElement = document.querySelector(
         'client-accounting-financial-info-widget[type="optionPurchasePower"] .c-number'
@@ -1107,10 +1128,11 @@ async function verifyOptionBuyFromPositions({
     positionLabel = OPTION_BUY_POSITION_LABEL,
     expectedDirection = "increase",
     isStopRequested,
-    progress
+    progress,
+    timeoutMs = getOptionOrderVerificationTimeoutMs()
 }) {
 
-    const deadline = Date.now() + OPTION_BUY_VERIFICATION_TIMEOUT_MS;
+    const deadline = Date.now() + timeoutMs;
     let filledQuantity = 0;
 
     while (Date.now() <= deadline) {
@@ -1976,6 +1998,10 @@ async function sendOptionBuyOrder() {
 
     const activePair = getActivePair();
     const isAutomaticExecution = !!activePair?.auto?.open?.executing;
+    const verificationTimeoutMs = getOptionOrderVerificationTimeoutMs(
+        isAutomaticExecution ? activePair : null,
+        isAutomaticExecution ? "open" : null
+    );
 
     if (isAutomaticExecution) {
         if (!canRunPairAutoWithPurchasePower(activePair, "open")) {
@@ -2112,7 +2138,8 @@ async function sendOptionBuyOrder() {
                         quantity: buyQuantityForStep,
                         positionBefore: buyPositionBefore,
                         isStopRequested: () => optionExecutionStopRequested,
-                        progress
+                        progress,
+                        timeoutMs: verificationTimeoutMs
                     });
 
                     buyExecuted = verification.executed;
@@ -2329,6 +2356,7 @@ async function sendInitialOptionPositionOrder() {
     const buyQuantityA = +byId("opt-buy-quantity").value;
     const sellQuantityB = +byId("opt-buy-sell-quantity").value;
     const executionCount = +byId("opt-buy-execution-count").value;
+    const verificationTimeoutMs = getOptionOrderVerificationTimeoutMs();
 
     status.classList.remove("success");
 
@@ -2488,7 +2516,8 @@ async function sendInitialOptionPositionOrder() {
                         quantity: buyQuantityForStep,
                         positionBefore: buyPositionBefore,
                         isStopRequested: () => optionExecutionStopRequested,
-                        progress
+                        progress,
+                        timeoutMs: verificationTimeoutMs
                     });
 
                     buyExecuted = verification.executed;
@@ -2682,6 +2711,10 @@ async function sendOptionOffsetOrder() {
 
     const activePair = getActivePair();
     const isAutomaticExecution = !!activePair?.auto?.offset?.executing;
+    const verificationTimeoutMs = getOptionOrderVerificationTimeoutMs(
+        isAutomaticExecution ? activePair : null,
+        isAutomaticExecution ? "offset" : null
+    );
 
     if (isAutomaticExecution && !canRunPairAutoWithPurchasePower(activePair, "offset")) {
         status.innerText = activePair.auto.offset.blockedReason;
@@ -2724,7 +2757,11 @@ async function sendOptionOffsetOrder() {
 
             checkSellCondition(
                 bidA,
-                askB
+                askB,
+                false,
+                false,
+                quoteB?.bid,
+                quoteA?.ask
             );
 
             if (!getOffsetConditionState(bidA, askB).isHit) {
@@ -2815,7 +2852,8 @@ async function sendOptionOffsetOrder() {
                         positionLabel: OPTION_SELL_POSITION_LABEL,
                         expectedDirection: "decrease",
                         isStopRequested: () => optionOffsetExecutionStopRequested,
-                        progress
+                        progress,
+                        timeoutMs: verificationTimeoutMs
                     });
 
                     buyExecuted = verification.executed;
@@ -3204,7 +3242,9 @@ function checkSellCondition(
     bidA,
     askB,
     bidAIsFallback = false,
-    askBIsFallback = false
+    askBIsFallback = false,
+    bidB = null,
+    askA = null
 ) {
     byId("sell-return-row").classList.remove("return-hit");
 
@@ -3214,6 +3254,38 @@ function checkSellCondition(
     askBElement.innerText = askB ?? "-";
     bidAElement.classList.toggle("quote-fallback", bidAIsFallback);
     askBElement.classList.toggle("quote-fallback", askBIsFallback);
+
+    const premium = +byId("opt-premium").value;
+    const expectedOffsetReturn = +byId("opt-expected-offset-return").value;
+    const updateAdditionalOffsetReturn = (rowId, valueId, firstPrice, secondPrice) => {
+        const row = byId(rowId);
+        const value = byId(valueId);
+        const hasPrices = Number.isFinite(firstPrice) && Number.isFinite(secondPrice);
+        const offsetReturn = premium > 0 && hasPrices
+            ? (((firstPrice - secondPrice) / premium) - 1) * 100
+            : null;
+
+        row.classList.remove("return-hit");
+        value.innerText = offsetReturn === null
+            ? "-"
+            : offsetReturn.toFixed(2);
+
+        if (offsetReturn !== null && offsetReturn > expectedOffsetReturn)
+            row.classList.add("return-hit");
+    };
+
+    updateAdditionalOffsetReturn(
+        "sell-return-ask-row",
+        "sell-return-ask-value",
+        askA,
+        askB
+    );
+    updateAdditionalOffsetReturn(
+        "sell-return-bid-row",
+        "sell-return-bid-value",
+        bidA,
+        bidB
+    );
 
     const offsetCondition = getOffsetConditionState(
         bidA,
@@ -3295,7 +3367,11 @@ function startOptionMonitoring(showMissingSymbolsMessage = true) {
         if (bidA !== null && bidA !== undefined && askB !== null && askB !== undefined) {
             checkSellCondition(
                 bidA,
-                askB
+                askB,
+                false,
+                false,
+                bid,
+                ask
             );
         } else {
             updateOptionAlarmState("offset", false);
@@ -3490,6 +3566,8 @@ function createPairState(source = {}) {
                 maxBuy: source.auto?.open?.maxBuy ?? 0,
                 maxDifference: source.auto?.open?.maxDifference ?? 0,
                 intervalMs: source.auto?.open?.intervalMs ?? 1000,
+                minimumReturn: source.auto?.open?.minimumReturn ?? "",
+                verificationTimeoutSeconds: source.auto?.open?.verificationTimeoutSeconds ?? "",
                 enabled: false,
                 executing: false,
                 nextAllowedAt: 0,
@@ -3499,6 +3577,8 @@ function createPairState(source = {}) {
                 minBuy: source.auto?.offset?.minBuy ?? 0,
                 maxDifference: source.auto?.offset?.maxDifference ?? 0,
                 intervalMs: source.auto?.offset?.intervalMs ?? 1000,
+                minimumReturn: source.auto?.offset?.minimumReturn ?? "",
+                verificationTimeoutSeconds: source.auto?.offset?.verificationTimeoutSeconds ?? "",
                 enabled: false,
                 executing: false,
                 nextAllowedAt: 0,
@@ -3510,10 +3590,10 @@ function createPairState(source = {}) {
     };
 }
 
-function savePairs() { localStorage.setItem(PAIRS_STORAGE_KEY, JSON.stringify(pairStates.map(pair => ({ id: pair.id, symbolA: pair.symbolA, symbolB: pair.symbolB, strategyKey: pair.strategyKey, quantities: pair.quantities, values: pair.values, executionCount: pair.executionCount, offsetExecutionCount: pair.offsetExecutionCount, auto: { open: { maxBuy: pair.auto.open.maxBuy, maxDifference: pair.auto.open.maxDifference, intervalMs: pair.auto.open.intervalMs }, offset: { minBuy: pair.auto.offset.minBuy, maxDifference: pair.auto.offset.maxDifference, intervalMs: pair.auto.offset.intervalMs } } })))); }
+function savePairs() { localStorage.setItem(PAIRS_STORAGE_KEY, JSON.stringify(pairStates.map(pair => ({ id: pair.id, symbolA: pair.symbolA, symbolB: pair.symbolB, strategyKey: pair.strategyKey, quantities: pair.quantities, values: pair.values, executionCount: pair.executionCount, offsetExecutionCount: pair.offsetExecutionCount, auto: { open: { maxBuy: pair.auto.open.maxBuy, maxDifference: pair.auto.open.maxDifference, intervalMs: pair.auto.open.intervalMs, minimumReturn: pair.auto.open.minimumReturn, verificationTimeoutSeconds: pair.auto.open.verificationTimeoutSeconds }, offset: { minBuy: pair.auto.offset.minBuy, maxDifference: pair.auto.offset.maxDifference, intervalMs: pair.auto.offset.intervalMs, minimumReturn: pair.auto.offset.minimumReturn, verificationTimeoutSeconds: pair.auto.offset.verificationTimeoutSeconds } } })))); }
 function loadPairs() { try { const saved = JSON.parse(localStorage.getItem(PAIRS_STORAGE_KEY) || "null"); pairStates = Array.isArray(saved) && saved.length ? saved.map(createPairState) : [createPairState()]; } catch (_) { pairStates = [createPairState()]; } }
-function saveGlobalSettings() { const ids = ["opt-auto-values", "opt-auto-buy-buttons", "opt-sync-order-quantities", "opt-limit-order-quantity-to-queue", "opt-verify-buy-position", "opt-alarm-enabled"]; const values = Object.fromEntries(ids.map(id => [id, byId(id)?.checked])); ["opt-alarm-count", "opt-alarm-interval", "opt-min-purchase-power"].forEach(id => values[id] = byId(id)?.value); values["opt-settings-open"] = !byId("opt-settings-body")?.hidden; localStorage.setItem(GLOBAL_STORAGE_KEY, JSON.stringify(values)); }
-function loadGlobalSettings() { let values = {}; try { values = JSON.parse(localStorage.getItem(GLOBAL_STORAGE_KEY) || "{}"); } catch (_) {} ["opt-auto-values", "opt-auto-buy-buttons", "opt-sync-order-quantities", "opt-limit-order-quantity-to-queue", "opt-verify-buy-position", "opt-alarm-enabled"].forEach(id => { if (typeof values[id] === "boolean") byId(id).checked = values[id]; }); ["opt-alarm-count", "opt-alarm-interval", "opt-min-purchase-power"].forEach(id => { if (values[id] !== undefined) byId(id).value = values[id]; }); if (values["opt-settings-open"]) { byId("opt-settings-body").hidden = false; byId("opt-settings-toggle").innerText = "-"; } }
+function saveGlobalSettings() { const ids = ["opt-auto-values", "opt-auto-buy-buttons", "opt-sync-order-quantities", "opt-limit-order-quantity-to-queue", "opt-verify-buy-position", "opt-alarm-enabled"]; const values = Object.fromEntries(ids.map(id => [id, byId(id)?.checked])); ["opt-alarm-count", "opt-alarm-interval", "opt-min-purchase-power", "opt-order-verification-timeout"].forEach(id => values[id] = byId(id)?.value); values["opt-settings-open"] = !byId("opt-settings-body")?.hidden; localStorage.setItem(GLOBAL_STORAGE_KEY, JSON.stringify(values)); }
+function loadGlobalSettings() { let values = {}; try { values = JSON.parse(localStorage.getItem(GLOBAL_STORAGE_KEY) || "{}"); } catch (_) {} ["opt-auto-values", "opt-auto-buy-buttons", "opt-sync-order-quantities", "opt-limit-order-quantity-to-queue", "opt-verify-buy-position", "opt-alarm-enabled"].forEach(id => { if (typeof values[id] === "boolean") byId(id).checked = values[id]; }); ["opt-alarm-count", "opt-alarm-interval", "opt-min-purchase-power", "opt-order-verification-timeout"].forEach(id => { if (values[id] !== undefined) byId(id).value = values[id]; }); if (values["opt-settings-open"]) { byId("opt-settings-body").hidden = false; byId("opt-settings-toggle").innerText = "-"; } }
 function getPairCard(pair) { return root.querySelector(`[data-pair-id="${CSS.escape(pair.id)}"]`); }
 function pairElement(pair, id) { return getPairCard(pair)?.querySelector(`#${id}`); }
 async function withPair(pair, task) {
@@ -3538,9 +3618,13 @@ function renderPair(pair) {
     card.querySelector("#opt-auto-open-max-buy").value = pair.auto.open.maxBuy;
     card.querySelector("#opt-auto-open-max-difference").value = pair.auto.open.maxDifference;
     card.querySelector("#opt-auto-open-interval").value = pair.auto.open.intervalMs;
+    card.querySelector("#opt-auto-open-min-return").value = pair.auto.open.minimumReturn;
+    card.querySelector("#opt-auto-open-verification-timeout").value = pair.auto.open.verificationTimeoutSeconds;
     card.querySelector("#opt-auto-offset-min-buy").value = pair.auto.offset.minBuy;
     card.querySelector("#opt-auto-offset-max-difference").value = pair.auto.offset.maxDifference;
     card.querySelector("#opt-auto-offset-interval").value = pair.auto.offset.intervalMs;
+    card.querySelector("#opt-auto-offset-min-return").value = pair.auto.offset.minimumReturn;
+    card.querySelector("#opt-auto-offset-verification-timeout").value = pair.auto.offset.verificationTimeoutSeconds;
     return card;
 }
 function renderAllPairs() { const container = byId("opt-pairs"); container.innerHTML = ""; pairStates.forEach(pair => container.appendChild(renderPair(pair))); bindPairEvents(); bindPairQuantitySync(); }
@@ -3593,7 +3677,7 @@ async function refreshAllPairs() {
         syncInitialPositionButtonVisibility();
     })));
 }
-function syncPairFromDom(pair) { pair.symbolA = pairElement(pair, "opt-symbol-a")?.value || ""; pair.symbolB = pairElement(pair, "opt-symbol-b")?.value || ""; pair.strategyKey = getSelectedOptionStrategyKey() || pair.strategyKey; pair.quantities.openBuyA = Number(pairElement(pair, "opt-buy-quantity")?.value || 0); pair.quantities.openSellB = Number(pairElement(pair, "opt-buy-sell-quantity")?.value || 0); pair.quantities.offsetBuyB = Number(pairElement(pair, "opt-offset-buy-quantity")?.value || 0); pair.quantities.offsetSellA = Number(pairElement(pair, "opt-sell-quantity")?.value || 0); pair.executionCount = Number(pairElement(pair, "opt-buy-execution-count")?.value || 1); pair.offsetExecutionCount = Number(pairElement(pair, "opt-sell-execution-count")?.value || 1); pair.values.maxValue = pairElement(pair, "opt-max-value")?.value || ""; pair.values.premium = pairElement(pair, "opt-premium")?.value || ""; pair.values.expectedReturn = pairElement(pair, "opt-expected-return")?.value || ""; pair.values.expectedOffsetReturn = pairElement(pair, "opt-expected-offset-return")?.value || ""; pair.auto.open.maxBuy = Number(pairElement(pair, "opt-auto-open-max-buy")?.value || 0); pair.auto.open.maxDifference = Number(pairElement(pair, "opt-auto-open-max-difference")?.value || 0); pair.auto.open.intervalMs = Number(pairElement(pair, "opt-auto-open-interval")?.value || 0); pair.auto.offset.minBuy = Number(pairElement(pair, "opt-auto-offset-min-buy")?.value || 0); pair.auto.offset.maxDifference = Number(pairElement(pair, "opt-auto-offset-max-difference")?.value || 0); pair.auto.offset.intervalMs = Number(pairElement(pair, "opt-auto-offset-interval")?.value || 0); savePairs(); }
+function syncPairFromDom(pair) { pair.symbolA = pairElement(pair, "opt-symbol-a")?.value || ""; pair.symbolB = pairElement(pair, "opt-symbol-b")?.value || ""; pair.strategyKey = getSelectedOptionStrategyKey() || pair.strategyKey; pair.quantities.openBuyA = Number(pairElement(pair, "opt-buy-quantity")?.value || 0); pair.quantities.openSellB = Number(pairElement(pair, "opt-buy-sell-quantity")?.value || 0); pair.quantities.offsetBuyB = Number(pairElement(pair, "opt-offset-buy-quantity")?.value || 0); pair.quantities.offsetSellA = Number(pairElement(pair, "opt-sell-quantity")?.value || 0); pair.executionCount = Number(pairElement(pair, "opt-buy-execution-count")?.value || 1); pair.offsetExecutionCount = Number(pairElement(pair, "opt-sell-execution-count")?.value || 1); pair.values.maxValue = pairElement(pair, "opt-max-value")?.value || ""; pair.values.premium = pairElement(pair, "opt-premium")?.value || ""; pair.values.expectedReturn = pairElement(pair, "opt-expected-return")?.value || ""; pair.values.expectedOffsetReturn = pairElement(pair, "opt-expected-offset-return")?.value || ""; pair.auto.open.maxBuy = Number(pairElement(pair, "opt-auto-open-max-buy")?.value || 0); pair.auto.open.maxDifference = Number(pairElement(pair, "opt-auto-open-max-difference")?.value || 0); pair.auto.open.intervalMs = Number(pairElement(pair, "opt-auto-open-interval")?.value || 0); pair.auto.open.minimumReturn = pairElement(pair, "opt-auto-open-min-return")?.value.trim() || ""; pair.auto.open.verificationTimeoutSeconds = pairElement(pair, "opt-auto-open-verification-timeout")?.value.trim() || ""; pair.auto.offset.minBuy = Number(pairElement(pair, "opt-auto-offset-min-buy")?.value || 0); pair.auto.offset.maxDifference = Number(pairElement(pair, "opt-auto-offset-max-difference")?.value || 0); pair.auto.offset.intervalMs = Number(pairElement(pair, "opt-auto-offset-interval")?.value || 0); pair.auto.offset.minimumReturn = pairElement(pair, "opt-auto-offset-min-return")?.value.trim() || ""; pair.auto.offset.verificationTimeoutSeconds = pairElement(pair, "opt-auto-offset-verification-timeout")?.value.trim() || ""; syncPairAutoAdvancedAppearance(pair, "open"); syncPairAutoAdvancedAppearance(pair, "offset"); savePairs(); }
 
 function getMonitorQuote(preferred, fallback) {
     const preferredNumber = Number(preferred);
@@ -3616,6 +3700,26 @@ function getPairAutoDirectionState(pair, direction) {
 
 function getPairAutoControlId(direction, name) {
     return `opt-auto-${direction}-${name}`;
+}
+
+function getPairAutoMinimumReturn(pair, direction) {
+    const configuredValue = String(
+        getPairAutoDirectionState(pair, direction).minimumReturn ?? ""
+    ).trim();
+    const fallbackId = direction === "open"
+        ? "opt-expected-return"
+        : "opt-expected-offset-return";
+    const fallbackValue = pairElement(pair, fallbackId)?.value ?? "";
+
+    return parseOptionNumber(configuredValue || fallbackValue);
+}
+
+function isPairAutoReturnHit(pair, direction, returnValue) {
+    const minimumReturn = getPairAutoMinimumReturn(pair, direction);
+
+    return Number.isFinite(returnValue) &&
+        Number.isFinite(minimumReturn) &&
+        returnValue > minimumReturn;
 }
 
 function setPairAutoStatus(pair, direction, text, isRunning = false) {
@@ -3680,7 +3784,82 @@ function togglePairAutoControls(pair, direction) {
         return;
 
     controls.hidden = !controls.hidden;
+    if (controls.hidden) {
+        const advanced = getPairCard(pair)?.querySelector(
+            `[data-auto-advanced="${direction}"]`
+        );
+        const advancedToggle = getPairCard(pair)?.querySelector(
+            `[data-action="toggle-auto-${direction}-advanced"]`
+        );
+
+        if (advanced)
+            advanced.hidden = true;
+        if (advancedToggle) {
+            advancedToggle.innerText = "⌄";
+            advancedToggle.title = "نمایش تنظیمات بیشتر";
+        }
+        section.classList.remove("auto-advanced-open");
+    }
     section.classList.toggle("auto-controls-open", !controls.hidden);
+}
+
+function syncPairAutoAdvancedAppearance(pair, direction) {
+    const card = getPairCard(pair);
+    const returnInput = pairElement(
+        pair,
+        direction === "open"
+            ? "opt-auto-open-min-return"
+            : "opt-auto-offset-min-return"
+    );
+    const timeoutInput = pairElement(
+        pair,
+        direction === "open"
+            ? "opt-auto-open-verification-timeout"
+            : "opt-auto-offset-verification-timeout"
+    );
+    const toggle = card?.querySelector(
+        `[data-action="toggle-auto-${direction}-advanced"]`
+    );
+    const returnIsConfigured = !!returnInput?.value.trim();
+    const timeoutIsConfigured = !!timeoutInput?.value.trim();
+
+    returnInput?.closest("label")?.classList.toggle(
+        "configured",
+        returnIsConfigured
+    );
+    timeoutInput?.closest("label")?.classList.toggle(
+        "configured",
+        timeoutIsConfigured
+    );
+    toggle?.classList.toggle(
+        "is-configured",
+        returnIsConfigured || timeoutIsConfigured
+    );
+}
+
+function togglePairAutoAdvanced(pair, direction) {
+    const card = getPairCard(pair);
+    const advanced = card?.querySelector(
+        `[data-auto-advanced="${direction}"]`
+    );
+    const controls = card?.querySelector(
+        `[data-auto-controls="${direction}"]`
+    );
+    const section = controls?.closest(".pair-monitor-section");
+    const toggle = card?.querySelector(
+        `[data-action="toggle-auto-${direction}-advanced"]`
+    );
+
+    if (!advanced || !section || !toggle)
+        return;
+
+    advanced.hidden = !advanced.hidden;
+    section.classList.remove("auto-advanced-open");
+    toggle.innerText = advanced.hidden ? "⌄" : "⌃";
+    toggle.title = advanced.hidden
+        ? "نمایش تنظیمات بیشتر"
+        : "مخفی کردن تنظیمات بیشتر";
+    syncPairAutoAdvancedAppearance(pair, direction);
 }
 
 async function readPairAutoPositions(pair) {
@@ -3698,6 +3877,42 @@ async function readPairAutoPositions(pair) {
     return { buyPositionA, sellPositionB };
 }
 
+function syncPairAutoPositionValues(pair) {
+    const buyPositionA = readOptionPositionQuantity(
+        pair.symbolA,
+        OPTION_BUY_POSITION_LABEL
+    );
+    const sellPositionB = readOptionPositionQuantity(
+        pair.symbolB,
+        OPTION_SELL_POSITION_LABEL
+    );
+    const currentDifference =
+        buyPositionA !== null && sellPositionB !== null
+            ? Math.abs(buyPositionA - sellPositionB)
+            : null;
+    const formatValue = value =>
+        Number.isFinite(value) ? formatOptionAutoValue(value) : "-";
+
+    [
+        ["open-buy", buyPositionA],
+        ["offset-buy", buyPositionA],
+        ["open-difference", currentDifference],
+        ["offset-difference", currentDifference]
+    ].forEach(([name, value]) => {
+        const target = getPairCard(pair)?.querySelector(
+            `[data-auto-current="${name}"]`
+        );
+
+        if (target)
+            target.innerText = formatValue(value);
+
+        target?.classList.toggle(
+            "has-difference",
+            name.endsWith("difference") && Number.isFinite(value) && value > 0
+        );
+    });
+}
+
 function isNonNegativeInteger(value) {
     return Number.isInteger(value) && value >= 0;
 }
@@ -3710,11 +3925,6 @@ async function canRunPairAutoOrder(pair, direction, showCheckingStatus = true) {
         return false;
     }
 
-    if (!isOptionBuyPositionVerificationEnabled()) {
-        setPairAutoBlocked(pair, direction, "تأیید موقعیت غیرفعال است");
-        return false;
-    }
-
     if (
         !isNonNegativeInteger(state.maxDifference) ||
         !isNonNegativeInteger(state.intervalMs) ||
@@ -3722,6 +3932,11 @@ async function canRunPairAutoOrder(pair, direction, showCheckingStatus = true) {
         (direction === "offset" && !isNonNegativeInteger(state.minBuy))
     ) {
         setPairAutoBlocked(pair, direction, "اعداد تنظیمات نامعتبرند");
+        return false;
+    }
+
+    if (!Number.isFinite(getPairAutoMinimumReturn(pair, direction))) {
+        setPairAutoBlocked(pair, direction, "حداقل بازده خودکار نامعتبر است");
         return false;
     }
 
@@ -3820,6 +4035,11 @@ function startPairAuto(pair, direction) {
             return;
         }
 
+        if (!Number.isFinite(getPairAutoMinimumReturn(pair, direction))) {
+            setPairAutoStatus(pair, direction, "حداقل بازده خودکار نامعتبر است");
+            return;
+        }
+
         state.enabled = true;
         state.executing = false;
         state.nextAllowedAt = 0;
@@ -3847,6 +4067,13 @@ function requestPairAutoOrder(pair, direction, conditionIsHit) {
         ? "opt-buy-order"
         : "opt-sell-order";
     const orderButton = pairElement(pair, orderButtonId);
+
+    // A direction whose return condition is not met must not temporarily
+    // occupy the pair. Otherwise it would block the other direction even
+    // when that direction is ready to submit an order.
+    if (!conditionIsHit) {
+        return;
+    }
 
     if (
         !state.enabled ||
@@ -3888,6 +4115,8 @@ async function updatePair(pair) {
     if (!pair.symbolA || !pair.symbolB) return;
 
     const conditions = await withPair(pair, async () => {
+        syncPairAutoPositionValues(pair);
+
         if (brokerAdapter.refreshOptionMarketData) {
             await brokerAdapter.refreshOptionMarketData().catch(() => {});
         }
@@ -3902,8 +4131,8 @@ async function updatePair(pair) {
         const offsetBid = getMonitorQuote(rawBidA, rawAskA);
         const offsetAsk = getMonitorQuote(rawAskB, rawBidB);
 
-        let buyIsHit = false;
-        let offsetIsHit = false;
+        let autoBuyIsHit = false;
+        let autoOffsetIsHit = false;
 
         if (buyAsk.value != null && buyBid.value != null) {
             checkBuyCondition(
@@ -3912,10 +4141,15 @@ async function updatePair(pair) {
                 buyAsk.isFallback,
                 buyBid.isFallback
             );
-            buyIsHit = getBuyConditionState(
+            const buyCondition = getBuyConditionState(
                 buyAsk.value,
                 buyBid.value
-            ).isHit;
+            );
+            autoBuyIsHit = isPairAutoReturnHit(
+                pair,
+                "open",
+                buyCondition.buyReturn
+            );
         } else {
             updateOptionAlarmState("buy", false);
         }
@@ -3925,21 +4159,28 @@ async function updatePair(pair) {
                 offsetBid.value,
                 offsetAsk.value,
                 offsetBid.isFallback,
-                offsetAsk.isFallback
+                offsetAsk.isFallback,
+                rawBidB,
+                rawAskA
             );
-            offsetIsHit = getOffsetConditionState(
+            const offsetCondition = getOffsetConditionState(
                 offsetBid.value,
                 offsetAsk.value
-            ).isHit;
+            );
+            autoOffsetIsHit = isPairAutoReturnHit(
+                pair,
+                "offset",
+                offsetCondition.offsetReturn
+            );
         } else {
             updateOptionAlarmState("offset", false);
         }
 
-        return { buyIsHit, offsetIsHit };
+        return { autoBuyIsHit, autoOffsetIsHit };
     });
 
-    requestPairAutoOrder(pair, "open", conditions?.buyIsHit);
-    requestPairAutoOrder(pair, "offset", conditions?.offsetIsHit);
+    requestPairAutoOrder(pair, "open", conditions?.autoBuyIsHit);
+    requestPairAutoOrder(pair, "offset", conditions?.autoOffsetIsHit);
 }
 
 function getPairShareMessage(pair, card = getPairCard(pair)) {
@@ -4011,11 +4252,24 @@ function bindPairEvents() {
 
         [
             "opt-auto-open-max-buy", "opt-auto-open-max-difference",
-            "opt-auto-open-interval", "opt-auto-offset-min-buy",
-            "opt-auto-offset-max-difference", "opt-auto-offset-interval"
+            "opt-auto-open-interval", "opt-auto-open-min-return",
+            "opt-auto-open-verification-timeout",
+            "opt-auto-offset-min-buy", "opt-auto-offset-max-difference",
+            "opt-auto-offset-interval", "opt-auto-offset-min-return",
+            "opt-auto-offset-verification-timeout"
         ].forEach(id => card.querySelector(`#${id}`).addEventListener(
             "change",
             () => withPair(pair, async () => syncPairFromDom(pair))
+        ));
+
+        [
+            ["opt-auto-open-min-return", "open"],
+            ["opt-auto-open-verification-timeout", "open"],
+            ["opt-auto-offset-min-return", "offset"],
+            ["opt-auto-offset-verification-timeout", "offset"]
+        ].forEach(([id, direction]) => card.querySelector(`#${id}`).addEventListener(
+            "input",
+            () => syncPairAutoAdvancedAppearance(pair, direction)
         ));
 
         card.querySelector('[data-action="remove-pair"]').onclick = () => {
@@ -4068,6 +4322,10 @@ function bindPairEvents() {
             togglePairAutoControls(pair, "open");
         card.querySelector('[data-action="toggle-auto-offset"]').onclick = () =>
             togglePairAutoControls(pair, "offset");
+        card.querySelector('[data-action="toggle-auto-open-advanced"]').onclick = () =>
+            togglePairAutoAdvanced(pair, "open");
+        card.querySelector('[data-action="toggle-auto-offset-advanced"]').onclick = () =>
+            togglePairAutoAdvanced(pair, "offset");
         card.querySelector("#opt-auto-open-start").onclick = () =>
             startPairAuto(pair, "open");
         card.querySelector("#opt-auto-open-stop").onclick = () =>
@@ -4079,6 +4337,8 @@ function bindPairEvents() {
 
         syncPairAutoControls(pair, "open");
         syncPairAutoControls(pair, "offset");
+        syncPairAutoAdvancedAppearance(pair, "open");
+        syncPairAutoAdvancedAppearance(pair, "offset");
     });
 }
 function bindPairQuantitySync() {
@@ -4173,7 +4433,7 @@ byId("opt-settings-toggle").onclick = () => { const body = byId("opt-settings-bo
 byId("opt-min-purchase-power").addEventListener("input", event => {
     formatMinimumOptionPurchasePowerWhileTyping(event.currentTarget);
 });
-["opt-auto-values", "opt-auto-buy-buttons", "opt-sync-order-quantities", "opt-limit-order-quantity-to-queue", "opt-verify-buy-position", "opt-alarm-enabled", "opt-alarm-count", "opt-alarm-interval", "opt-min-purchase-power"].forEach(id => byId(id).addEventListener("change", () => {
+["opt-auto-values", "opt-auto-buy-buttons", "opt-sync-order-quantities", "opt-limit-order-quantity-to-queue", "opt-verify-buy-position", "opt-alarm-enabled", "opt-alarm-count", "opt-alarm-interval", "opt-min-purchase-power", "opt-order-verification-timeout"].forEach(id => byId(id).addEventListener("change", () => {
     if (id === "opt-min-purchase-power")
         normalizeMinimumOptionPurchasePowerInput();
 

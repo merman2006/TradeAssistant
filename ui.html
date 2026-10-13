@@ -36,6 +36,7 @@
                 <label class="option-check-row"><input id="opt-sync-order-quantities" type="checkbox" checked><span>برابر نگه داشتن تعدادهای خرید و فروش</span></label>
                 <label class="option-check-row"><input id="opt-limit-order-quantity-to-queue" type="checkbox" checked><span>محدود کردن تعداد برابر به حجم سرخط</span></label>
                 <label class="option-check-row"><input id="opt-verify-buy-position" type="checkbox" checked><span>ارسال سفارش پایه دوم پس از انجام معاملهٔ سفارش پایه اول</span></label>
+                <label class="option-order-verification-timeout"><span>مهلت تأیید سفارش</span><input id="opt-order-verification-timeout" type="number" min="1" step="1" value="10"><span>ثانیه</span></label>
                 <div id="opt-alarm-row" class="option-alarm-row">
                     <label class="option-check-row"><input id="opt-alarm-enabled" type="checkbox" checked><span>آلارم</span></label>
                     <label id="opt-alarm-count-field" class="option-alarm-field"><span>تعداد</span><input id="opt-alarm-count" type="number" min="1" max="20" value="5"></label>
@@ -55,7 +56,7 @@
                     <span title="بیشترین اسپرد">بیشترین اسپرد</span><span title="حداقل بازده">حداقل بازده</span><span title="Ask(A)">Ask(A)</span><span title="Bid(B)">Bid(B)</span><span title="Spread">Spread</span><span title="BuyReturn">BuyReturn</span><span title="تعداد">تعداد</span><span title="خرید A">خرید A</span><span title="فروش B">فروش B</span><span title="بازکردن">بازکردن</span><span title="م اول">م اول</span><span title="توقف">توقف</span>
                 </div>
                 <div class="pair-table-header-box pair-offset-header">
-                    <span title="پریمیوم">پریمیوم</span><span title="حداقل بازده آفست">حداقل بازده آفست</span><span title="Bid(A)">Bid(A)</span><span title="Ask(B)">Ask(B)</span><span title="Spread">Spread</span><span title="OffsetReturn">OffsetReturn</span><span title="تعداد">تعداد</span><span title="خرید B">خرید B</span><span title="فروش A">فروش A</span><span title="آفست">آفست</span><span title="توقف">توقف</span>
+                    <span title="پریمیوم">پریمیوم</span><span title="حداقل بازده آفست">حداقل بازده آفست</span><span title="Bid(A)">Bid(A)</span><span title="Ask(B)">Ask(B)</span><span title="Spread">Spread</span><span title="OffsetReturn">OffsetReturn</span><span title="OffsetReturnAsk">ORAsk</span><span title="OffsetReturnBid">ORBid</span><span title="تعداد">تعداد</span><span title="خرید B">خرید B</span><span title="فروش A">فروش A</span><span title="آفست">آفست</span><span title="توقف">توقف</span>
                 </div>
             </div>
             <div id="opt-pairs" class="option-pairs"></div>
@@ -96,9 +97,16 @@
                         </div>
                         <div class="pair-status"><button class="pair-status-dismiss" data-action="clear-open-message" type="button" title="بستن پیام" aria-label="بستن پیام">×</button><span id="opt-execution-progress"></span></div>
                         <div class="pair-auto-controls" data-auto-controls="open" hidden>
-                            <label><span>حداکثر خرید</span><input id="opt-auto-open-max-buy" type="number" min="0" value="0"></label>
-                            <label><span>حداکثر اختلاف</span><input id="opt-auto-open-max-difference" type="number" min="0" value="0"></label>
-                            <label><span>فاصله (ms)</span><input id="opt-auto-open-interval" type="number" min="0" value="1000"></label>
+                            <label><span>حداکثر خرید (<span class="pair-auto-current-value" data-auto-current="open-buy">-</span>)</span><input id="opt-auto-open-max-buy" type="text" value="0"></label>
+                            <label><span>حداکثر اختلاف (<span class="pair-auto-current-value" data-auto-current="open-difference">-</span>)</span><input id="opt-auto-open-max-difference" type="text" value="0"></label>
+                            <div class="pair-auto-advanced-trigger">
+                                <button class="pair-auto-advanced-toggle" data-action="toggle-auto-open-advanced" type="button" title="نمایش تنظیمات بیشتر" aria-label="نمایش تنظیمات بیشتر">⌄</button>
+                                <div class="pair-auto-advanced" data-auto-advanced="open" hidden>
+                                    <label><span title="حداقل بازده خودکار">بازده</span><input id="opt-auto-open-min-return" type="text" inputmode="decimal" value="" title="خالی باشد از حداقل بازده اصلی استفاده می‌شود"></label>
+                                    <label><span title="فاصلهٔ بین اجراها به میلی‌ثانیه">فاصله</span><input id="opt-auto-open-interval" type="number" min="0" value="1000"></label>
+                                    <label><span title="مهلت تأیید سفارش به ثانیه">تأیید</span><input id="opt-auto-open-verification-timeout" type="number" min="1" step="1" value="" title="خالی باشد از مهلت تأیید سفارش در تنظیمات کلی استفاده می‌شود"></label>
+                                </div>
+                            </div>
                             <button id="opt-auto-open-start" class="buy-btn" type="button">اجرای خودکار</button>
                             <button id="opt-auto-open-stop" class="sell-btn" type="button" disabled>توقف</button>
                             <span id="opt-auto-open-status" class="pair-auto-status"></span>
@@ -113,7 +121,7 @@
                             <span><b id="sell-bid-a-value">-</b></span><span><b id="sell-ask-b-value">-</b></span>
                         </div>
                         <div class="pair-returns">
-                            <span><b id="sell-spread-value">-</b></span><span id="sell-return-row"><b id="sell-return-value">-</b></span>
+                            <span><b id="sell-spread-value">-</b></span><span id="sell-return-row"><b id="sell-return-value">-</b></span><span id="sell-return-ask-row"><b id="sell-return-ask-value">-</b></span><span id="sell-return-bid-row"><b id="sell-return-bid-value">-</b></span>
                         </div>
                         <div class="pair-orders">
                             <label><input id="opt-sell-execution-count" type="number" min="1" value="1"></label>
@@ -124,9 +132,16 @@
                         </div>
                         <div class="pair-status"><button class="pair-status-dismiss" data-action="clear-offset-message" type="button" title="بستن پیام" aria-label="بستن پیام">×</button><span id="opt-offset-execution-progress"></span></div>
                         <div class="pair-auto-controls" data-auto-controls="offset" hidden>
-                            <label><span>تعداد مانده</span><input id="opt-auto-offset-min-buy" type="number" min="0" value="0"></label>
-                            <label><span>حداکثر اختلاف</span><input id="opt-auto-offset-max-difference" type="number" min="0" value="0"></label>
-                            <label><span>فاصله (ms)</span><input id="opt-auto-offset-interval" type="number" min="0" value="1000"></label>
+                            <label><span>تعداد مانده (<span class="pair-auto-current-value" data-auto-current="offset-buy">-</span>)</span><input id="opt-auto-offset-min-buy" type="text" value="0"></label>
+                            <label><span>حداکثر اختلاف (<span class="pair-auto-current-value" data-auto-current="offset-difference">-</span>)</span><input id="opt-auto-offset-max-difference" type="text" value="0"></label>
+                            <div class="pair-auto-advanced-trigger">
+                                <button class="pair-auto-advanced-toggle" data-action="toggle-auto-offset-advanced" type="button" title="نمایش تنظیمات بیشتر" aria-label="نمایش تنظیمات بیشتر">⌄</button>
+                                <div class="pair-auto-advanced" data-auto-advanced="offset" hidden>
+                                    <label><span title="حداقل بازده آفست خودکار">بازده</span><input id="opt-auto-offset-min-return" type="text" inputmode="decimal" value="" title="خالی باشد از حداقل بازده آفست اصلی استفاده می‌شود"></label>
+                                    <label><span title="فاصلهٔ بین اجراها به میلی‌ثانیه">فاصله</span><input id="opt-auto-offset-interval" type="number" min="0" value="1000"></label>
+                                    <label><span title="مهلت تأیید سفارش به ثانیه">تأیید</span><input id="opt-auto-offset-verification-timeout" type="number" min="1" step="1" value="" title="خالی باشد از مهلت تأیید سفارش در تنظیمات کلی استفاده می‌شود"></label>
+                                </div>
+                            </div>
                             <button id="opt-auto-offset-start" class="sell-btn" type="button">اجرای خودکار</button>
                             <button id="opt-auto-offset-stop" class="sell-btn" type="button" disabled>توقف</button>
                             <span id="opt-auto-offset-status" class="pair-auto-status"></span>
